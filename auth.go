@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/jackc/pgx/v5"
@@ -24,15 +25,17 @@ func selectUser(userID string, conn *pgx.Conn) (User, error) {
 	WHERE user_id = $1
 	`
 	var user User
+	fmt.Println(userID)
 
 	err := conn.QueryRow(context.Background(),
 		selectQuery, userID).Scan(&user.Username, &user.Fullname, &user.Role, &user.Email, &user.ProfileImage)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return User{}, &CustomError{unauthorized, "invalid user details"}
+			return User{}, &CustomError{unauthorized, fmt.Sprintf("error validating user %v", err)}
 		}
-		return User{}, &CustomError{serverCode, "error validating user"}
+		return User{}, &CustomError{serverCode, fmt.Sprintf("error validating user %v", err)}
 	}
 
+	fmt.Println(user)
 	return user, nil
 }

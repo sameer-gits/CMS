@@ -17,7 +17,7 @@ func main() {
 	}
 
 	conn := getConn()
-
+	defer conn.Close(context.Background())
 	// err = createSchema(conn)
 	// if err != nil {
 	//     log.Fatalf("Unable to create schema: %v\n", err)
@@ -27,6 +27,7 @@ func main() {
 }
 
 func getConn() *pgx.Conn {
+
 	conn, err := pgx.Connect(context.Background(), os.Getenv("DATABASE_URL"))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
@@ -35,6 +36,5 @@ func getConn() *pgx.Conn {
 		fmt.Println("Connected to database")
 	}
 
-	defer conn.Close(context.Background())
 	return conn
 }

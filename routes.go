@@ -50,11 +50,12 @@ func routes(conn *pgx.Conn) {
 func homepage(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(contextKey).(Cookie).UserID
 	conn := getConn()
+	fmt.Println(userID)
 	renderTempl(w, "homepage.html", userID, conn)
 }
 
 func middleware(next http.HandlerFunc) http.HandlerFunc {
-	userID := "userID"
+	userID := "1aedddb7-259e-48f3-ad45-82436df3b074"
 	// userID fetch here using JWT
 	return func(w http.ResponseWriter, r *http.Request) {
 
