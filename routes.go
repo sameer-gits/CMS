@@ -71,7 +71,7 @@ func middleware(next http.HandlerFunc) http.HandlerFunc {
 func renderTempl(w http.ResponseWriter, name string, userID string, conn *pgx.Conn) {
 	user, err := selectUser(userID, conn)
 	if err != nil {
-		http.Error(w, "Error fetching user details", serverCode)
+		http.Error(w, fmt.Sprintf("Error fetching user details: %v", err), serverCode)
 		return
 	}
 

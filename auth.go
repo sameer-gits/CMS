@@ -2,13 +2,23 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"net/http"
 
 	"github.com/jackc/pgx/v5"
 )
 
+type CustomError struct {
+	StatusCode int
+	Message    string
+}
+
+func (e *CustomError) Error() string {
+	return e.Message
+}
+
 func selectUser(userID string, conn *pgx.Conn) (User, error) {
-	unauthorized := "Invalid username or password"
+	unauthorized := http.StatusUnauthorized
+	serverCode := http.StatusInternalServerError
 	selectQuery := `
 	SELECT username, fullname, role, email, profile_image FROM users
 	WHERE user_id = $1
@@ -19,9 +29,9 @@ func selectUser(userID string, conn *pgx.Conn) (User, error) {
 		selectQuery, userID).Scan(&user.Username, &user.Fullname, &user.Role, &user.Email, &user.ProfileImage)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return User{}, fmt.Errorf(unauthorized)
+			return User{}, &CustomError{unauthorized, "invalid user details"}
 		}
-		return User{}, fmt.Errorf("error validating username: %s", err.Error())
+		return User{}, &CustomError{serverCode, "error validating user"}
 	}
 
 	return user, nil
