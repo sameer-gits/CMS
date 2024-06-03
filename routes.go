@@ -49,7 +49,8 @@ func routes(conn *pgx.Conn) {
 
 func homepage(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(contextKey).(Cookie).UserID
-	renderTempl(w, "homepage.html", userID)
+	conn := getConn()
+	renderTempl(w, "homepage.html", userID, conn)
 }
 
 func middleware(next http.HandlerFunc) http.HandlerFunc {
@@ -67,8 +68,8 @@ func middleware(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func renderTempl(w http.ResponseWriter, name string, userID string) {
-	user, err := selectUser(userID)
+func renderTempl(w http.ResponseWriter, name string, userID string, conn *pgx.Conn) {
+	user, err := selectUser(userID, conn)
 	if err != nil {
 		http.Error(w, "Error fetching user details", serverCode)
 		return
