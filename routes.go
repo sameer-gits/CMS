@@ -7,8 +7,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-
-	"github.com/jackc/pgx/v5"
 )
 
 type User struct {
@@ -31,7 +29,7 @@ const serverCode = http.StatusInternalServerError
 const contextKey CtxKey = "key"
 const views = "views/"
 
-func routes(conn *pgx.Conn) {
+func routes() {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000"
@@ -41,7 +39,6 @@ func routes(conn *pgx.Conn) {
 
 	log.Println("server running on: http://localhost:" + port)
 
-	log.Println(conn)
 	if err := http.ListenAndServe("0.0.0.0:"+port, nil); err != nil {
 		log.Fatal("Server error: ", err)
 	}
@@ -49,9 +46,7 @@ func routes(conn *pgx.Conn) {
 
 func homepage(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(contextKey).(Cookie).UserID
-	conn := getConn()
-	fmt.Println(userID)
-	renderTempl(w, "homepage.html", userID, conn)
+	renderTempl(w, "homepage.html", userID)
 }
 
 func middleware(next http.HandlerFunc) http.HandlerFunc {
@@ -69,8 +64,8 @@ func middleware(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func renderTempl(w http.ResponseWriter, name string, userID string, conn *pgx.Conn) {
-	user, err := selectUser(userID, conn)
+func renderTempl(w http.ResponseWriter, name string, userID string) {
+	user, err := selectUser(userID)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error fetching user details: %v", err), serverCode)
 		return

@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/sameer-gits/CMS/database"
 )
 
 type CustomError struct {
@@ -17,7 +18,7 @@ func (e *CustomError) Error() string {
 	return e.Message
 }
 
-func selectUser(userID string, conn *pgx.Conn) (User, error) {
+func selectUser(userID string) (User, error) {
 	unauthorized := http.StatusUnauthorized
 	serverCode := http.StatusInternalServerError
 	selectQuery := `
@@ -27,7 +28,7 @@ func selectUser(userID string, conn *pgx.Conn) (User, error) {
 	var user User
 	fmt.Println(userID)
 
-	err := conn.QueryRow(context.Background(),
+	err := database.Conn.QueryRow(context.Background(),
 		selectQuery, userID).Scan(&user.Username, &user.Fullname, &user.Role, &user.Email, &user.ProfileImage)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -36,6 +37,6 @@ func selectUser(userID string, conn *pgx.Conn) (User, error) {
 		return User{}, &CustomError{serverCode, fmt.Sprintf("error validating user %v", err)}
 	}
 
-	fmt.Println(user)
+	fmt.Println(user.Fullname)
 	return user, nil
 }
