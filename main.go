@@ -3,9 +3,15 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 
 	"github.com/joho/godotenv"
 )
+
+var serverCode = http.StatusInternalServerError
+var unauthorized = http.StatusUnauthorized
+var statusOK = http.StatusOK
+var badCode = http.StatusBadRequest
 
 func main() {
 	err := godotenv.Load()

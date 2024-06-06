@@ -25,7 +25,6 @@ type Cookie struct {
 
 type CtxKey string
 
-const serverCode = http.StatusInternalServerError
 const contextKey CtxKey = "key"
 const views = "views/"
 
@@ -36,6 +35,25 @@ func routes() {
 	}
 
 	http.HandleFunc("/", middleware(homepage))
+	http.HandleFunc("/login", loginPage)
+
+	http.HandleFunc("POST /login", func(w http.ResponseWriter, r *http.Request) {
+		formType := r.FormValue("form_type")
+		switch formType {
+		case "login":
+			err := login(w, r)
+			if err != nil {
+				http.Error(w, err.Error(), serverCode)
+				return
+			}
+			fmt.Println("done")
+			http.Redirect(w, r, "/", http.StatusSeeOther)
+
+		default:
+			http.Error(w, "Invalid form type", badCode)
+			return
+		}
+	})
 
 	log.Println("server running on: http://localhost:" + port)
 
@@ -46,7 +64,11 @@ func routes() {
 
 func homepage(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(contextKey).(Cookie).UserID
-	renderTempl(w, "homepage.html", userID)
+	renderTemplData(w, "homepage.html", userID)
+}
+
+func loginPage(w http.ResponseWriter, r *http.Request) {
+	renderTempl(w, "login.html")
 }
 
 func middleware(next http.HandlerFunc) http.HandlerFunc {
@@ -64,7 +86,20 @@ func middleware(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func renderTempl(w http.ResponseWriter, name string, userID string) {
+func renderTempl(w http.ResponseWriter, name string) {
+	tmpl, err := template.ParseFiles(views + name)
+	if err != nil {
+		http.Error(w, "Error parsing template", serverCode)
+		return
+	}
+
+	err = tmpl.Execute(w, nil)
+	if err != nil {
+		http.Error(w, "Error executing template", serverCode)
+		return
+	}
+}
+func renderTemplData(w http.ResponseWriter, name string, userID string) {
 	user, err := selectUser(userID)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error fetching user details: %v", err), serverCode)
