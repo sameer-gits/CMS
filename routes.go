@@ -33,11 +33,12 @@ func routes() {
 	if port == "" {
 		port = "3000"
 	}
+	mux := http.NewServeMux()
 
-	http.HandleFunc("/", middleware(homepage))
-	http.HandleFunc("/login", loginPage)
+	mux.HandleFunc("/", middleware(homepage))
+	mux.HandleFunc("/login", loginPage)
 
-	http.HandleFunc("POST /login", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /login", func(w http.ResponseWriter, r *http.Request) {
 		formType := r.FormValue("form_type")
 		switch formType {
 		case "login":
@@ -47,7 +48,7 @@ func routes() {
 				return
 			}
 			fmt.Println("done")
-			http.Redirect(w, r, "/", http.StatusSeeOther)
+			http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 
 		default:
 			http.Error(w, "Invalid form type", badCode)
@@ -57,12 +58,16 @@ func routes() {
 
 	log.Println("server running on: http://localhost:" + port)
 
-	if err := http.ListenAndServe("0.0.0.0:"+port, nil); err != nil {
+	if err := http.ListenAndServe("0.0.0.0:"+port, mux); err != nil {
 		log.Fatal("Server error: ", err)
 	}
 }
 
 func homepage(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
 	userID := r.Context().Value(contextKey).(Cookie).UserID
 	renderTemplData(w, "homepage.html", userID)
 }
