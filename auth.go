@@ -33,9 +33,9 @@ func login(w http.ResponseWriter, r *http.Request) error {
 		http.Error(w, "Invalid username or password", unauthorized)
 	}
 	user := User{UserID: userID}
+	// make it set JWT here
 	fmt.Printf("User logged in: %+v\n", user)
 
-	w.WriteHeader(statusOK)
 	return nil
 }
 

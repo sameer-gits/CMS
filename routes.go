@@ -36,7 +36,7 @@ func routes() {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", middleware(homepage))
-	mux.HandleFunc("/login", loginPage)
+	mux.HandleFunc("GET /login", loginPage)
 
 	mux.HandleFunc("POST /login", func(w http.ResponseWriter, r *http.Request) {
 		formType := r.FormValue("form_type")
@@ -47,9 +47,7 @@ func routes() {
 				http.Error(w, err.Error(), serverCode)
 				return
 			}
-			fmt.Println("done")
-			http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
-
+			http.Redirect(w, r, "/", http.StatusMovedPermanently)
 		default:
 			http.Error(w, "Invalid form type", badCode)
 			return

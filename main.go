@@ -8,10 +8,12 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var serverCode = http.StatusInternalServerError
-var unauthorized = http.StatusUnauthorized
-var statusOK = http.StatusOK
-var badCode = http.StatusBadRequest
+const (
+	serverCode   = http.StatusInternalServerError
+	unauthorized = http.StatusUnauthorized
+	statusOK     = http.StatusOK
+	badCode      = http.StatusBadRequest
+)
 
 func main() {
 	err := godotenv.Load()
