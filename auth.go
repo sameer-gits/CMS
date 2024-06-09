@@ -3,58 +3,128 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 )
 
-func login(w http.ResponseWriter, r *http.Request) error {
-	username := strings.TrimSpace(r.FormValue("username"))
-	password := strings.TrimSpace(r.FormValue("password"))
+var rEmail = regexp.MustCompile(`.+@.+\..+`)
 
-	if username == "" {
-		http.Error(w, "Enter username", badCode)
+func register(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		http.Error(w, fmt.Sprintf("Form error, file might be too large: %v", err), serverCode)
+		return
 	}
-
-	if password == "" {
-		http.Error(w, "Enter password", badCode)
+	user := &User{
+		Username: r.FormValue("username"),
+		Fullname: r.FormValue("fullname"),
+		Role:     r.FormValue("role"),
+		Email:    r.FormValue("email"),
+		Password: r.FormValue("password"),
 	}
-
-	userID, hashedPassword, err := checkPassword(username)
+	profileImage, _, err := r.FormFile("profile_image")
 	if err != nil {
-		http.Error(w, err.Error(), unauthorized)
-		return err
+		if err == http.ErrMissingFile {
+			fmt.Println("No Profile Image")
+		} else {
+			http.Error(w, fmt.Sprintf("Error processing image: %v", err), serverCode)
+			return
+		}
+	} else {
+		defer profileImage.Close()
+
+		user.ProfileImage, err = io.ReadAll(profileImage)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Error reading profile image: %v", err), serverCode)
+			return
+		}
+
+		filetype := http.DetectContentType(user.ProfileImage)
+		if filetype != "image/jpeg" && filetype != "image/png" && filetype != "image/gif" {
+			http.Error(w, "Format is not allowed. Please upload a JPEG, PNG or GIF", badCode)
+			return
+		}
+		fmt.Println("Profile Image uploaded")
 	}
 
-	err = bcrypt.CompareHashAndPassword(hashedPassword, []byte(password))
+	if !rEmail.MatchString(user.Email) {
+		http.Error(w, "Invalid Email", badCode)
+	}
+
+	if strings.TrimSpace(user.Username) == "" {
+		http.Error(w, "Enter Username", badCode)
+	}
+
+	if strings.TrimSpace(user.Fullname) == "" {
+		http.Error(w, "Enter Password", badCode)
+	}
+
+	if strings.TrimSpace(user.Password) == "" {
+		http.Error(w, "Enter Password", badCode)
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
-		http.Error(w, "Invalid username or password", unauthorized)
+		http.Error(w, fmt.Sprintf("Error processing password: %v", err), serverCode)
 	}
-	user := User{UserID: userID}
-	// make it set JWT here
-	fmt.Printf("User logged in: %+v\n", user)
 
-	return nil
+	insertQuery := `
+    INSERT INTO users (username, fullname, role, email, profile_image, password_hash)
+    VALUES ($1, $2, $3, $4, $5, $6)
+    RETURNING user_id
+    `
+	err = Conn.QueryRow(context.Background(), insertQuery, user.Username, user.Fullname, user.Role,
+		user.Email, user.ProfileImage, hashedPassword).Scan(&user.UserID)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error register user: %v", err), serverCode)
+	}
+	user.Password = ""
+	cookieSet(w, user.UserID)
 }
 
-func checkPassword(username string) (string, []byte, error) {
+func login(w http.ResponseWriter, r *http.Request) {
+	username := strings.TrimSpace(r.FormValue("username"))
+	if username == "" {
+		http.Error(w, "Enter Username", badCode)
+	}
+
+	password := strings.TrimSpace(r.FormValue("password"))
+	if password == "" {
+		http.Error(w, "Enter Password", badCode)
+	}
+
+	userID := checkPassword(w, username, password)
+	password = ""
+	cookieSet(w, userID)
+}
+
+func checkPassword(w http.ResponseWriter, username, password string) string {
 	selectQuery := `
     SELECT user_id, password_hash FROM users
     WHERE username = $1
     `
-
 	var userID string
 	var hashedPassword []byte
 
 	err := Conn.QueryRow(context.Background(), selectQuery, username).Scan(&userID, &hashedPassword)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return "", nil, fmt.Errorf("user not found")
+			http.Error(w, "User not Found", serverCode)
+			return ""
+		} else {
+			http.Error(w, fmt.Sprintf("Error querying database: %v", err), serverCode)
+			return ""
 		}
-		return "", nil, fmt.Errorf("error querying database: %v", err)
+	} else {
+		err := bcrypt.CompareHashAndPassword(hashedPassword, []byte(password))
+		if err != nil {
+			http.Error(w, "Invalid username or password", unauthorized)
+			return ""
+		}
 	}
-
-	return userID, hashedPassword, nil
+	return userID
 }

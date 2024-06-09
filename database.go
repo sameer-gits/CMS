@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 
 	"github.com/jackc/pgx/v5"
@@ -32,14 +31,11 @@ func InitDB() error {
 }
 
 func selectUser(userID string) (User, error) {
-	unauthorized := http.StatusUnauthorized
-	serverCode := http.StatusInternalServerError
 	selectQuery := `
 	SELECT username, fullname, role, email, profile_image FROM users
 	WHERE user_id = $1
 	`
 	var user User
-	fmt.Println(userID)
 
 	err := Conn.QueryRow(context.Background(),
 		selectQuery, userID).Scan(&user.Username, &user.Fullname, &user.Role, &user.Email, &user.ProfileImage)
@@ -50,6 +46,5 @@ func selectUser(userID string) (User, error) {
 		return User{}, &CustomError{serverCode, fmt.Sprintf("error validating user %v", err)}
 	}
 
-	fmt.Println(user.Fullname)
 	return user, nil
 }

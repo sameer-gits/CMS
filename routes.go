@@ -10,22 +10,18 @@ import (
 )
 
 type User struct {
-	UserID       string `json:"user_id"`
-	Username     string `json:"username"`
-	Fullname     string `json:"fullname"`
-	Role         string `json:"role"`
-	Email        string `json:"email"`
-	Password     string `json:"password"`
-	ProfileImage []byte `json:"profile_image"`
-}
-
-type Cookie struct {
-	UserID string
+	UserID       string `form:"user_id" json:"user_id"`
+	Username     string `form:"username" json:"username"`
+	Fullname     string `form:"fullname" json:"fullname"`
+	Role         string `form:"role" json:"role"`
+	Email        string `form:"email" json:"email"`
+	Password     string `form:"password" json:"password"`
+	ProfileImage []byte `form:"profile_image,omitempty" json:"profile_image,omitempty"`
 }
 
 type CtxKey string
 
-const contextKey CtxKey = "key"
+const contextKey CtxKey = "userID"
 const views = "views/"
 
 func routes() {
@@ -36,17 +32,17 @@ func routes() {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", middleware(homepage))
-	mux.HandleFunc("GET /login", loginPage)
+	mux.HandleFunc("/login", loginPage)
+	mux.HandleFunc("/logout", cookieDelete)
 
 	mux.HandleFunc("POST /login", func(w http.ResponseWriter, r *http.Request) {
 		formType := r.FormValue("form_type")
 		switch formType {
+		case "register":
+			register(w, r)
+			http.Redirect(w, r, "/", http.StatusMovedPermanently)
 		case "login":
-			err := login(w, r)
-			if err != nil {
-				http.Error(w, err.Error(), serverCode)
-				return
-			}
+			login(w, r)
 			http.Redirect(w, r, "/", http.StatusMovedPermanently)
 		default:
 			http.Error(w, "Invalid form type", badCode)
@@ -66,7 +62,7 @@ func homepage(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	userID := r.Context().Value(contextKey).(Cookie).UserID
+	userID := r.Context().Value(contextKey).(string)
 	renderTemplData(w, "homepage.html", userID)
 }
 
@@ -75,15 +71,13 @@ func loginPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func middleware(next http.HandlerFunc) http.HandlerFunc {
-	userID := "1aedddb7-259e-48f3-ad45-82436df3b074"
-	// userID fetch here using JWT
 	return func(w http.ResponseWriter, r *http.Request) {
-
-		cookie := Cookie{
-			UserID: userID,
+		userID, err := cookieGet(r)
+		if err != nil {
+			http.Error(w, err.Error(), unauthorized)
 		}
 
-		ctx := context.WithValue(r.Context(), contextKey, cookie)
+		ctx := context.WithValue(r.Context(), contextKey, userID)
 		fmt.Println("i'm middleware")
 		next(w, r.WithContext(ctx))
 	}
@@ -102,6 +96,7 @@ func renderTempl(w http.ResponseWriter, name string) {
 		return
 	}
 }
+
 func renderTemplData(w http.ResponseWriter, name string, userID string) {
 	user, err := selectUser(userID)
 	if err != nil {
@@ -116,14 +111,12 @@ func renderTemplData(w http.ResponseWriter, name string, userID string) {
 	}
 
 	data := struct {
-		UserID       string
 		Username     string
 		Fullname     string
 		Role         string
 		Email        string
 		ProfileImage []byte
 	}{
-		UserID:       userID,
 		Username:     user.Username,
 		Fullname:     user.Fullname,
 		Role:         user.Role,
