@@ -83,7 +83,10 @@ func register(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Error register user: %v", err), serverCode)
 	}
 	user.Password = ""
-	cookieSet(w, user.UserID)
+	cookieErr := writeCookie(w, user.UserID)
+	if cookieErr != nil {
+		http.Error(w, cookieErr.Error(), serverCode)
+	}
 }
 
 func login(w http.ResponseWriter, r *http.Request) {
@@ -99,7 +102,10 @@ func login(w http.ResponseWriter, r *http.Request) {
 
 	userID := checkPassword(w, username, password)
 	password = ""
-	cookieSet(w, userID)
+	cookieErr := writeCookie(w, userID)
+	if cookieErr != nil {
+		http.Error(w, cookieErr.Error(), serverCode)
+	}
 }
 
 func checkPassword(w http.ResponseWriter, username, password string) string {

@@ -33,7 +33,7 @@ func routes() {
 
 	mux.HandleFunc("/", middleware(homepage))
 	mux.HandleFunc("/login", loginPage)
-	mux.HandleFunc("/logout", cookieDelete)
+	mux.HandleFunc("/logout", deleteCookie)
 
 	mux.HandleFunc("POST /login", func(w http.ResponseWriter, r *http.Request) {
 		formType := r.FormValue("form_type")
@@ -72,7 +72,7 @@ func loginPage(w http.ResponseWriter, r *http.Request) {
 
 func middleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, err := cookieGet(r)
+		userID, err := getCookie(r)
 		if err != nil {
 			http.Error(w, err.Error(), unauthorized)
 		}
