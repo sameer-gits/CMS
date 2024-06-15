@@ -62,7 +62,7 @@ func register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if strings.TrimSpace(user.Fullname) == "" {
-		http.Error(w, "Enter Password", badCode)
+		http.Error(w, "Enter Fullname", badCode)
 		return
 	}
 
@@ -78,11 +78,11 @@ func register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	insertQuery := `
-    INSERT INTO users (username, fullname, role, email, profile_image, password_hash)
-    VALUES ($1, $2, $3, $4, $5, $6)
+    INSERT INTO users (username, fullname, email, profile_image, password_hash)
+    VALUES ($1, $2, $3, $4, $5)
     RETURNING user_id
     `
-	err = Conn.QueryRow(context.Background(), insertQuery, user.Username, user.Fullname, user.Role,
+	err = Conn.QueryRow(context.Background(), insertQuery, user.Username, user.Fullname,
 		user.Email, user.ProfileImage, hashedPassword).Scan(&user.UserID)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error register user: %v", err), serverCode)
