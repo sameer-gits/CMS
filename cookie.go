@@ -1,18 +1,17 @@
 package main
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
-	"os"
-	"strings"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 var (
-	secretKey         = []byte(os.Getenv("SECRET_KEY"))
 	errLong           = errors.New("cookie value too long")
 	errCookieNotFound = errors.New("cookie not found")
 	errInvalid        = errors.New("invalid cookie value")
@@ -23,7 +22,7 @@ const cookieName = "cookie"
 func writeCookie(w http.ResponseWriter, userID string) error {
 	data, err := encryptCookieData(userID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to encrypt cookie data: %w", err)
 	}
 
 	cookie := http.Cookie{
@@ -60,9 +59,10 @@ func deleteCookie(w http.ResponseWriter, r *http.Request) {
 	cookie := http.Cookie{
 		Name:   cookieName,
 		MaxAge: -1,
+		Path:   "/",
 	}
 	http.SetCookie(w, &cookie)
-	http.Redirect(w, r, "/", http.StatusMovedPermanently)
+	http.Redirect(w, r, "/", http.StatusFound)
 }
 
 func base64Encode(input []byte) string {
@@ -76,42 +76,53 @@ func base64Decode(input string) ([]byte, error) {
 	}
 	return value, nil
 }
-func encryptCookieData(userID string) (string, error) {
-	hashedsecretKey, err := bcrypt.GenerateFromPassword(secretKey, bcrypt.DefaultCost)
+
+func encryptCookieData(data string) (string, error) {
+	block, err := aes.NewCipher([]byte(secretKey))
 	if err != nil {
-		return "", errors.New("Error processing cookie")
+		return "", fmt.Errorf("failed to create cipher: %w", err)
 	}
 
-	hashedCookie, err := bcrypt.GenerateFromPassword([]byte(userID), bcrypt.DefaultCost)
+	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return "", errors.New("Error processing cookie data")
+		return "", fmt.Errorf("failed to create GCM: %w", err)
 	}
 
-	secretKeyData := base64Encode(hashedsecretKey)
-	cookieData := base64Encode(hashedCookie)
-	data := fmt.Sprintf("%s.%s", secretKeyData, cookieData)
-	fmt.Println(data)
-	return data, nil
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", fmt.Errorf("failed to generate nonce: %w", err)
+	}
+
+	encryptedData := gcm.Seal(nonce, nonce, []byte(data), nil)
+	return base64Encode(encryptedData), nil
 }
 
-func validateCookieData(cookieValue string) (string, error) {
-	parts := strings.Split(cookieValue, ".")
-	if len(parts) != 2 {
+func validateCookieData(data string) (string, error) {
+	encryptedData, err := base64Decode(data)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode base64 data: %w", err)
+	}
+
+	block, err := aes.NewCipher([]byte(secretKey))
+	if err != nil {
+		return "", fmt.Errorf("failed to create cipher: %w", err)
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", fmt.Errorf("failed to create GCM: %w", err)
+	}
+
+	nonceSize := gcm.NonceSize()
+	if len(encryptedData) < nonceSize {
 		return "", errInvalid
 	}
-	key := parts[0]
-	data := parts[1]
 
-	fmt.Println(data)
-
-	keyByte, keyErr := base64Decode(key)
-	if keyErr != nil {
-		return "", keyErr
-	}
-	err := bcrypt.CompareHashAndPassword(keyByte, secretKey)
+	nonce, ciphertext := encryptedData[:nonceSize], encryptedData[nonceSize:]
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
-		return "", nil
+		return "", fmt.Errorf("failed to decrypt data: %w", err)
 	}
 
-	return cookieValue, nil
+	return string(plaintext), nil
 }

@@ -53,23 +53,28 @@ func register(w http.ResponseWriter, r *http.Request) {
 
 	if !rEmail.MatchString(user.Email) {
 		http.Error(w, "Invalid Email", badCode)
+		return
 	}
 
 	if strings.TrimSpace(user.Username) == "" {
 		http.Error(w, "Enter Username", badCode)
+		return
 	}
 
 	if strings.TrimSpace(user.Fullname) == "" {
 		http.Error(w, "Enter Password", badCode)
+		return
 	}
 
 	if strings.TrimSpace(user.Password) == "" {
 		http.Error(w, "Enter Password", badCode)
+		return
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error processing password: %v", err), serverCode)
+		return
 	}
 
 	insertQuery := `
@@ -81,11 +86,13 @@ func register(w http.ResponseWriter, r *http.Request) {
 		user.Email, user.ProfileImage, hashedPassword).Scan(&user.UserID)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error register user: %v", err), serverCode)
+		return
 	}
 	user.Password = ""
 	cookieErr := writeCookie(w, user.UserID)
 	if cookieErr != nil {
 		http.Error(w, cookieErr.Error(), serverCode)
+		return
 	}
 }
 
@@ -93,11 +100,13 @@ func login(w http.ResponseWriter, r *http.Request) {
 	username := strings.TrimSpace(r.FormValue("username"))
 	if username == "" {
 		http.Error(w, "Enter Username", badCode)
+		return
 	}
 
 	password := strings.TrimSpace(r.FormValue("password"))
 	if password == "" {
 		http.Error(w, "Enter Password", badCode)
+		return
 	}
 
 	userID := checkPassword(w, username, password)
@@ -105,6 +114,7 @@ func login(w http.ResponseWriter, r *http.Request) {
 	cookieErr := writeCookie(w, userID)
 	if cookieErr != nil {
 		http.Error(w, cookieErr.Error(), serverCode)
+		return
 	}
 }
 

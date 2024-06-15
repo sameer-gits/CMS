@@ -4,8 +4,15 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/joho/godotenv"
+)
+
+var (
+	databaseURL string
+	secretKey   string
+	port        string
 )
 
 const (
@@ -15,16 +22,22 @@ const (
 	badCode      = http.StatusBadRequest
 )
 
-func main() {
+func init() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		log.Printf("Error loading .env file")
 	}
+	databaseURL = os.Getenv("DATABASE_URL")
+	secretKey = os.Getenv("SECRET_KEY")
+	port = os.Getenv("PORT")
+}
+
+func main() {
 	InitDB()
 	defer Conn.Close(context.Background())
 	// err = createSchema(conn)
 	// if err != nil {
-	//     log.Fatalf("Unable to create schema: %v\n", err)
+	//     log.Printf("Unable to create schema: %v\n", err)
 	// }
 
 	routes()

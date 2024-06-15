@@ -6,7 +6,6 @@ import (
 	"html/template"
 	"log"
 	"net/http"
-	"os"
 )
 
 type User struct {
@@ -25,9 +24,8 @@ const contextKey CtxKey = "userID"
 const views = "views/"
 
 func routes() {
-	port := os.Getenv("PORT")
 	if port == "" {
-		port = "3000"
+		port = "8000"
 	}
 	mux := http.NewServeMux()
 
@@ -53,7 +51,7 @@ func routes() {
 	log.Println("server running on: http://localhost:" + port)
 
 	if err := http.ListenAndServe("0.0.0.0:"+port, mux); err != nil {
-		log.Fatal("Server error: ", err)
+		log.Printf("Server error: %v", err)
 	}
 }
 
@@ -75,6 +73,7 @@ func middleware(next http.HandlerFunc) http.HandlerFunc {
 		userID, err := getCookie(r)
 		if err != nil {
 			http.Error(w, err.Error(), unauthorized)
+			// return or DO Something
 		}
 
 		ctx := context.WithValue(r.Context(), contextKey, userID)
