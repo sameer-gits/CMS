@@ -1,9 +1,6 @@
 package main
 
 import (
-	"context"
-	"fmt"
-	"html/template"
 	"log"
 	"net/http"
 )
@@ -29,9 +26,10 @@ func routes() {
 	}
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("/", middleware(homepage))
+	// all routes here
+	mux.HandleFunc("/", notFound(middleware(homepage)))
 	mux.HandleFunc("/login", loginPage)
-	mux.HandleFunc("/logout", deleteCookie)
+	mux.HandleFunc("/protected", middleware(protected))
 
 	mux.HandleFunc("POST /login", func(w http.ResponseWriter, r *http.Request) {
 		formType := r.FormValue("form_type")
@@ -48,6 +46,9 @@ func routes() {
 		}
 	})
 
+	//just for deleting cookie
+	mux.HandleFunc("/logout", deleteCookie)
+
 	log.Println("server running on: http://localhost:" + port)
 
 	if err := http.ListenAndServe("0.0.0.0:"+port, mux); err != nil {
@@ -55,82 +56,29 @@ func routes() {
 	}
 }
 
+// protected routes here
 func homepage(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
-		http.NotFound(w, r)
-		return
-	}
 	userID := r.Context().Value(contextKey).(string)
 	renderTemplData(w, "homepage.html", userID)
 }
 
+func protected(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(contextKey).(string)
+	renderTemplData(w, "protected.html", userID)
+}
+
+// unprotected routes here
 func loginPage(w http.ResponseWriter, r *http.Request) {
 	renderTempl(w, "login.html")
 }
 
-func middleware(next http.HandlerFunc) http.HandlerFunc {
+// not Found Route
+func notFound(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, err := getCookie(r)
-		if err != nil {
-			// DO Something and then return
-			redirectToLogin(w, r)
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
 			return
 		}
-
-		ctx := context.WithValue(r.Context(), contextKey, userID)
-		fmt.Println("i'm middleware and getCookie has data is confirmed")
-		next(w, r.WithContext(ctx))
-	}
-}
-
-func redirectToLogin(w http.ResponseWriter, r *http.Request) {
-	http.Redirect(w, r, "/login", http.StatusSeeOther)
-}
-
-func renderTempl(w http.ResponseWriter, name string) {
-	tmpl, err := template.ParseFiles(views + name)
-	if err != nil {
-		http.Error(w, "Error parsing template", serverCode)
-		return
-	}
-
-	err = tmpl.Execute(w, nil)
-	if err != nil {
-		http.Error(w, "Error executing template", serverCode)
-		return
-	}
-}
-
-func renderTemplData(w http.ResponseWriter, name string, userID string) {
-	user, err := selectUser(userID)
-	if err != nil {
-		http.Error(w, fmt.Sprintf("Error fetching user details: %v", err), serverCode)
-		return
-	}
-
-	tmpl, err := template.ParseFiles(views + name)
-	if err != nil {
-		http.Error(w, "Error parsing template", serverCode)
-		return
-	}
-
-	data := struct {
-		Username     string
-		Fullname     string
-		Role         string
-		Email        string
-		ProfileImage []byte
-	}{
-		Username:     user.Username,
-		Fullname:     user.Fullname,
-		Role:         user.Role,
-		Email:        user.Email,
-		ProfileImage: user.ProfileImage,
-	}
-
-	err = tmpl.Execute(w, data)
-	if err != nil {
-		http.Error(w, "Error executing template", serverCode)
-		return
+		next(w, r)
 	}
 }
