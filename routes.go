@@ -38,10 +38,10 @@ func routes() {
 		switch formType {
 		case "register":
 			register(w, r)
-			http.Redirect(w, r, "/", http.StatusMovedPermanently)
+			http.Redirect(w, r, "/", http.StatusFound)
 		case "login":
 			login(w, r)
-			http.Redirect(w, r, "/", http.StatusMovedPermanently)
+			http.Redirect(w, r, "/", http.StatusFound)
 		default:
 			http.Error(w, "Invalid form type", badCode)
 			return
@@ -72,14 +72,19 @@ func middleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, err := getCookie(r)
 		if err != nil {
-			http.Error(w, err.Error(), unauthorized)
-			// return or DO Something
+			// DO Something and then return
+			redirectToLogin(w, r)
+			return
 		}
 
 		ctx := context.WithValue(r.Context(), contextKey, userID)
-		fmt.Println("i'm middleware")
+		fmt.Println("i'm middleware and getCookie has data is confirmed")
 		next(w, r.WithContext(ctx))
 	}
+}
+
+func redirectToLogin(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
 func renderTempl(w http.ResponseWriter, name string) {
