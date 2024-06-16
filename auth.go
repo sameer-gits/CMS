@@ -109,7 +109,11 @@ func login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := checkPassword(w, username, password)
+	userID, err := checkPassword(username, password)
+	if err != nil {
+		http.Error(w, err.Error(), unauthorized)
+		return
+	}
 	password = ""
 	cookieErr := writeCookie(w, userID)
 	if cookieErr != nil {
@@ -118,7 +122,7 @@ func login(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func checkPassword(w http.ResponseWriter, username, password string) string {
+func checkPassword(username, password string) (string, error) {
 	selectQuery := `
     SELECT user_id, password_hash FROM users
     WHERE username = $1
@@ -129,18 +133,15 @@ func checkPassword(w http.ResponseWriter, username, password string) string {
 	err := Conn.QueryRow(context.Background(), selectQuery, username).Scan(&userID, &hashedPassword)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			http.Error(w, "User not Found", serverCode)
-			return ""
+			return "", fmt.Errorf("user not found")
 		} else {
-			http.Error(w, fmt.Sprintf("Error querying database: %v", err), serverCode)
-			return ""
+			return "", fmt.Errorf(fmt.Sprintf("error querying database: %v", err))
 		}
 	} else {
 		err := bcrypt.CompareHashAndPassword(hashedPassword, []byte(password))
 		if err != nil {
-			http.Error(w, "Invalid username or password", unauthorized)
-			return ""
+			return "", fmt.Errorf("invalid username or password")
 		}
 	}
-	return userID
+	return userID, nil
 }
