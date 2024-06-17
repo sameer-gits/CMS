@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -122,25 +123,25 @@ func login(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func checkPassword(username, password string) (string, error) {
+func checkPassword(username, password string) (uuid.UUID, error) {
 	selectQuery := `
     SELECT user_id, password_hash FROM users
     WHERE username = $1
     `
-	var userID string
+	var userID uuid.UUID
 	var hashedPassword []byte
 
 	err := Conn.QueryRow(context.Background(), selectQuery, username).Scan(&userID, &hashedPassword)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return "", fmt.Errorf("user not found")
+			return uuid.Nil, fmt.Errorf("user not found")
 		} else {
-			return "", fmt.Errorf(fmt.Sprintf("error querying database: %v", err))
+			return uuid.Nil, fmt.Errorf(fmt.Sprintf("error querying database: %v", err))
 		}
 	} else {
 		err := bcrypt.CompareHashAndPassword(hashedPassword, []byte(password))
 		if err != nil {
-			return "", fmt.Errorf("invalid username or password")
+			return uuid.Nil, fmt.Errorf("invalid username or password")
 		}
 	}
 	return userID, nil

@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/google/uuid"
 )
 
 var (
@@ -19,7 +21,7 @@ var (
 
 const cookieName = "cookie"
 
-func writeCookie(w http.ResponseWriter, userID string) error {
+func writeCookie(w http.ResponseWriter, userID uuid.UUID) error {
 	data, err := encryptCookieData(userID)
 	if err != nil {
 		return fmt.Errorf("failed to encrypt cookie data: %w", err)
@@ -77,7 +79,7 @@ func base64Decode(input string) ([]byte, error) {
 	return value, nil
 }
 
-func encryptCookieData(data string) (string, error) {
+func encryptCookieData(data uuid.UUID) (string, error) {
 	block, err := aes.NewCipher([]byte(secretKey))
 	if err != nil {
 		return "", fmt.Errorf("failed to create cipher: %w", err)
@@ -93,7 +95,7 @@ func encryptCookieData(data string) (string, error) {
 		return "", fmt.Errorf("failed to generate nonce: %w", err)
 	}
 
-	encryptedData := gcm.Seal(nonce, nonce, []byte(data), nil)
+	encryptedData := gcm.Seal(nonce, nonce, []byte(data.String()), nil)
 	return base64Encode(encryptedData), nil
 }
 

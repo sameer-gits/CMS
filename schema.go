@@ -62,7 +62,7 @@ func createSchema() error {
     -- forum table
     CREATE TABLE forums (
         forum_id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-        forum_name VARCHAR(128) NOT NULL,
+        forum_name VARCHAR(128) NOT NULL UNIQUE,
         forum_image BYTEA NOT NULL,
         public BOOLEAN NOT NULL DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

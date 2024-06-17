@@ -27,6 +27,11 @@ func renderTemplData(w http.ResponseWriter, r *http.Request, name string, userID
 		http.Redirect(w, r, "/logout", http.StatusFound)
 		return
 	}
+	forums, err := selectForums()
+	if err != nil {
+		http.Redirect(w, r, "/logout", http.StatusFound)
+		return
+	}
 
 	tmpl, err := template.ParseFiles(views + name)
 	if err != nil {
@@ -35,17 +40,11 @@ func renderTemplData(w http.ResponseWriter, r *http.Request, name string, userID
 	}
 
 	data := struct {
-		Username     string
-		Fullname     string
-		Role         string
-		Email        string
-		ProfileImage []byte
+		User   User
+		Forums []Forum
 	}{
-		Username:     user.Username,
-		Fullname:     user.Fullname,
-		Role:         user.Role,
-		Email:        user.Email,
-		ProfileImage: user.ProfileImage,
+		User:   user,
+		Forums: forums,
 	}
 
 	err = tmpl.Execute(w, data)

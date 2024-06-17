@@ -4,16 +4,18 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
+	"github.com/google/uuid"
 )
 
 type User struct {
-	UserID       string `form:"user_id" json:"user_id"`
-	Username     string `form:"username" json:"username"`
-	Fullname     string `form:"fullname" json:"fullname"`
-	Role         string `form:"role" json:"role"`
-	Email        string `form:"email" json:"email"`
-	Password     string `form:"password" json:"password"`
-	ProfileImage []byte `form:"profile_image,omitempty" json:"profile_image,omitempty"`
+	UserID       uuid.UUID `form:"user_id" json:"user_id"`
+	Username     string    `form:"username" json:"username"`
+	Fullname     string    `form:"fullname" json:"fullname"`
+	Role         string    `form:"role" json:"role"`
+	Email        string    `form:"email" json:"email"`
+	Password     string    `form:"password" json:"password"`
+	ProfileImage []byte    `form:"profile_image,omitempty" json:"profile_image,omitempty"`
 }
 
 type CtxKey string
@@ -30,7 +32,13 @@ func routes() {
 	// all routes here
 	mux.HandleFunc("/", notFound(middleware(homepage)))
 	mux.HandleFunc("/login", loginPage)
-	mux.HandleFunc("/protected", middleware(protected))
+	mux.HandleFunc("/forum", middleware(forum))
+
+	mux.HandleFunc("POST /newforum", middleware(func(w http.ResponseWriter, r *http.Request) {
+		userID := r.Context().Value(contextKey).(string)
+		newForum(userID, w, r)
+		http.Redirect(w, r, "/forum", http.StatusFound)
+	}))
 
 	mux.HandleFunc("POST /login", func(w http.ResponseWriter, r *http.Request) {
 		formType := r.FormValue("form_type")
@@ -63,9 +71,9 @@ func homepage(w http.ResponseWriter, r *http.Request) {
 	renderTemplData(w, r, "homepage.html", userID)
 }
 
-func protected(w http.ResponseWriter, r *http.Request) {
+func forum(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(contextKey).(string)
-	renderTemplData(w, r, "protected.html", userID)
+	renderTemplData(w, r, "forum.html", userID)
 }
 
 // unprotected routes here
