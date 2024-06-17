@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 )
@@ -76,6 +77,7 @@ func loginPage(w http.ResponseWriter, r *http.Request) {
 func notFound(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
+			fmt.Printf("not found route: %v\n", r.URL.Path)
 			http.NotFound(w, r)
 			return
 		}

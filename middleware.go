@@ -22,5 +22,6 @@ func middleware(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func redirectToLogin(w http.ResponseWriter, r *http.Request) {
-	http.Redirect(w, r, "/login", http.StatusSeeOther)
+	// /logout will delete cookie and redirect to login
+	http.Redirect(w, r, "/logout", http.StatusSeeOther)
 }
