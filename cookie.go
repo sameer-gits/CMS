@@ -62,7 +62,7 @@ func deleteCookie(w http.ResponseWriter, r *http.Request) {
 		Path:   "/",
 	}
 	http.SetCookie(w, &cookie)
-	http.Redirect(w, r, "/", http.StatusFound)
+	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
 func base64Encode(input []byte) string {

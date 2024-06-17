@@ -3,11 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
-
-	"github.com/jackc/pgx/v5"
 )
 
-func createSchema(conn *pgx.Conn) error {
+func createSchema() error {
 	schema := `
     DROP TABLE IF EXISTS articles;
     DROP TABLE IF EXISTS categories;
@@ -30,36 +28,34 @@ func createSchema(conn *pgx.Conn) error {
         email VARCHAR(128) NOT NULL UNIQUE,
         profile_image BYTEA,
         joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        password_hash BYTEA NOT NULL -- SHA256
+        password_hash BYTEA NOT NULL
     );
 
     -- article category table
     CREATE TABLE categories (
         category_id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-        name VARCHAR(64) NULL UNIQUE
+        name VARCHAR(64) NOT NULL UNIQUE
     );
 
     -- article table
     CREATE TABLE articles (
-        author_id UUID,
+        author VARCHAR(64) NOT NULL,
         category_id UUID,
         title VARCHAR(256) NOT NULL UNIQUE,
         content TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         article_id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-        FOREIGN KEY (author_id) REFERENCES users(user_id) ON DELETE CASCADE,
         FOREIGN KEY (category_id) REFERENCES categories(category_id) ON DELETE SET NULL
     );
 
     -- message or comment
     CREATE TABLE messages (
+        author VARCHAR(64) NOT NULL,
         message_id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-        author_id UUID,
         reply_to UUID,
         content TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         in_table CHAR CHECK (in_table IN ('F', 'A', 'P')) NOT NULL,
-        FOREIGN KEY (author_id) REFERENCES users(user_id) ON DELETE CASCADE,
         FOREIGN KEY (reply_to) REFERENCES messages(message_id) ON DELETE CASCADE
     );
 
@@ -69,8 +65,9 @@ func createSchema(conn *pgx.Conn) error {
         forum_name VARCHAR(128) NOT NULL,
         forum_image BYTEA NOT NULL,
         public BOOLEAN NOT NULL DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_by VARCHAR(64) NOT NULL
+        );
 
     -- forum_users | many to many
     CREATE TABLE forum_users (
@@ -97,8 +94,8 @@ func createSchema(conn *pgx.Conn) error {
     CREATE TABLE polls (
         poll_id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
         poll_title VARCHAR(256) NOT NULL,
-        creator_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_by VARCHAR(64) NOT NULL
     );
 
     -- poll options
@@ -114,11 +111,26 @@ func createSchema(conn *pgx.Conn) error {
         vote_id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
         poll_id UUID REFERENCES polls(poll_id) ON DELETE CASCADE,
         option_id UUID REFERENCES poll_options(option_id) ON DELETE CASCADE,
-        voter_id UUID REFERENCES users(user_id) ON DELETE CASCADE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        voter VARCHAR(64) NOT NULL,
+        UNIQUE (poll_id, voter)
     );
+    
+    CREATE INDEX idx_username ON users (username);
+    CREATE INDEX idx_name ON categories (name);
+    CREATE INDEX idx_title ON articles (title);
+    CREATE INDEX idx_author_article ON articles (author);
+    CREATE INDEX idx_in_table ON messages (in_table);
+    CREATE INDEX idx_author_messages ON messages (author);
+    CREATE INDEX idx_forum_name ON forums (forum_name);
+    CREATE INDEX idx_forum_id_users ON forum_users (forum_id);
+    CREATE INDEX idx_forum_id_admins ON forum_admins (forum_id);
+    CREATE INDEX idx_forum_id_mods ON forum_mods (forum_id);
+    CREATE INDEX idx_poll_id_polls ON polls (poll_id);
+    CREATE INDEX idx_poll_id_options ON poll_options (poll_id);
+    CREATE INDEX idx_poll_id_votes ON poll_votes (poll_id);
     `
-	_, err := conn.Exec(context.Background(), schema)
+	_, err := Conn.Exec(context.Background(), schema)
 	if err != nil {
 		return fmt.Errorf("faild to make schema: %v", err)
 	}

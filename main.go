@@ -35,9 +35,9 @@ func init() {
 func main() {
 	InitDB()
 	defer Conn.Close(context.Background())
-	// err = createSchema(conn)
+	// err := createSchema()
 	// if err != nil {
-	//     log.Printf("Unable to create schema: %v\n", err)
+	// 	log.Printf("Unable to create schema: %v\n", err)
 	// }
 
 	routes()

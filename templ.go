@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"html/template"
 	"net/http"
 )
@@ -22,10 +21,10 @@ func renderTempl(w http.ResponseWriter, name string) {
 }
 
 // render template with data
-func renderTemplData(w http.ResponseWriter, name string, userID string) {
+func renderTemplData(w http.ResponseWriter, r *http.Request, name string, userID string) {
 	user, err := selectUser(userID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error fetching user details: %v", err), serverCode)
+		http.Redirect(w, r, "/logout", http.StatusFound)
 		return
 	}
 

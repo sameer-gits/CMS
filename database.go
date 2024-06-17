@@ -41,7 +41,7 @@ func selectUser(userID string) (User, error) {
 		selectQuery, userID).Scan(&user.Username, &user.Fullname, &user.Role, &user.Email, &user.ProfileImage)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return User{}, &CustomError{unauthorized, fmt.Sprintf("error validating user %v", err)}
+			return User{}, &CustomError{unauthorized, fmt.Sprintf("error validating user: %v", err)}
 		}
 		return User{}, &CustomError{serverCode, fmt.Sprintf("error validating user %v", err)}
 	}

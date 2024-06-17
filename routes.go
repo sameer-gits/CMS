@@ -59,12 +59,12 @@ func routes() {
 // protected routes here
 func homepage(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(contextKey).(string)
-	renderTemplData(w, "homepage.html", userID)
+	renderTemplData(w, r, "homepage.html", userID)
 }
 
 func protected(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value(contextKey).(string)
-	renderTemplData(w, "protected.html", userID)
+	renderTemplData(w, r, "protected.html", userID)
 }
 
 // unprotected routes here
