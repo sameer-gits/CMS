@@ -127,6 +127,5 @@ func selectForums() ([]Forum, error) {
 	if rows.Err() != nil {
 		return nil, &CustomError{serverCode, fmt.Sprintf("error iterating rows: %v", rows.Err())}
 	}
-
 	return forums, nil
 }

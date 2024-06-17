@@ -33,6 +33,7 @@ func routes() {
 	mux.HandleFunc("/", notFound(middleware(homepage)))
 	mux.HandleFunc("/login", loginPage)
 	mux.HandleFunc("/forum", middleware(forum))
+	mux.HandleFunc("/forumlist", middleware(forumlist))
 
 	mux.HandleFunc("POST /newforum", middleware(func(w http.ResponseWriter, r *http.Request) {
 		newForum(w, r)
@@ -70,7 +71,11 @@ func homepage(w http.ResponseWriter, r *http.Request) {
 }
 
 func forum(w http.ResponseWriter, r *http.Request) {
-	renderTemplData(w, r, "forum.html")
+	renderTemplData(w, r, "forum.html", "forumlist.html")
+}
+
+func forumlist(w http.ResponseWriter, r *http.Request) {
+	renderTemplData(w, r, "forumlist.html")
 }
 
 // unprotected routes here

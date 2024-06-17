@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"html/template"
 	"net/http"
 	"path/filepath"
@@ -28,14 +29,22 @@ func renderTempl(w http.ResponseWriter, name ...string) {
 
 // render template with data
 func renderTemplData(w http.ResponseWriter, r *http.Request, name ...string) {
-	userID := r.Context().Value(contextKey).(string)
+	userID, err := getCookie(r)
+	if err != nil {
+		http.Error(w, err.Error(), unauthorized)
+		return
+	}
+
 	user, err := selectUser(userID)
 	if err != nil {
-		http.Redirect(w, r, "/logout", http.StatusFound)
+		// there is problem not sure!
+		fmt.Println("Hello")
+		// http.Redirect(w, r, "/logout", http.StatusFound)
 		return
 	}
 	forums, err := selectForums()
 	if err != nil {
+		// there is problem not sure!
 		http.Redirect(w, r, "/logout", http.StatusFound)
 		return
 	}
