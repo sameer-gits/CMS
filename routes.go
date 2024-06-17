@@ -35,8 +35,7 @@ func routes() {
 	mux.HandleFunc("/forum", middleware(forum))
 
 	mux.HandleFunc("POST /newforum", middleware(func(w http.ResponseWriter, r *http.Request) {
-		userID := r.Context().Value(contextKey).(string)
-		newForum(userID, w, r)
+		newForum(w, r)
 		http.Redirect(w, r, "/forum", http.StatusFound)
 	}))
 
@@ -67,13 +66,11 @@ func routes() {
 
 // protected routes here
 func homepage(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value(contextKey).(string)
-	renderTemplData(w, r, "homepage.html", userID)
+	renderTemplData(w, r, "homepage.html")
 }
 
 func forum(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value(contextKey).(string)
-	renderTemplData(w, r, "forum.html", userID)
+	renderTemplData(w, r, "forum.html")
 }
 
 // unprotected routes here

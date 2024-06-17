@@ -3,11 +3,11 @@
 <body>
 
 <h1>My Auth Heading</h1>
-{{ range .Forums}}
 <div>
+{{ range .Forums}}
     <p>{{.Name}}</p>
+    {{ end }}
 </div>
-{{ end }}
 <div>
     <h1>New Forum</h1>
     <h1>{{.User.Username}}</h1>

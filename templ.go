@@ -3,11 +3,17 @@ package main
 import (
 	"html/template"
 	"net/http"
+	"path/filepath"
 )
 
 // render template without data
-func renderTempl(w http.ResponseWriter, name string) {
-	tmpl, err := template.ParseFiles(views + name)
+func renderTempl(w http.ResponseWriter, name ...string) {
+	var templateFiles []string
+	for _, n := range name {
+		templateFiles = append(templateFiles, filepath.Join(views, n))
+	}
+
+	tmpl, err := template.ParseFiles(templateFiles...)
 	if err != nil {
 		http.Error(w, "Error parsing template", serverCode)
 		return
@@ -21,7 +27,8 @@ func renderTempl(w http.ResponseWriter, name string) {
 }
 
 // render template with data
-func renderTemplData(w http.ResponseWriter, r *http.Request, name string, userID string) {
+func renderTemplData(w http.ResponseWriter, r *http.Request, name ...string) {
+	userID := r.Context().Value(contextKey).(string)
 	user, err := selectUser(userID)
 	if err != nil {
 		http.Redirect(w, r, "/logout", http.StatusFound)
@@ -32,8 +39,12 @@ func renderTemplData(w http.ResponseWriter, r *http.Request, name string, userID
 		http.Redirect(w, r, "/logout", http.StatusFound)
 		return
 	}
+	var templateFiles []string
+	for _, n := range name {
+		templateFiles = append(templateFiles, filepath.Join(views, n))
+	}
 
-	tmpl, err := template.ParseFiles(views + name)
+	tmpl, err := template.ParseFiles(templateFiles...)
 	if err != nil {
 		http.Error(w, "Error parsing template", serverCode)
 		return

@@ -62,7 +62,8 @@ func selectUser(userID string) (User, error) {
 	return user, nil
 }
 
-func newForum(userID string, w http.ResponseWriter, r *http.Request) {
+func newForum(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(contextKey).(string)
 	forum := Forum{
 		Name: r.FormValue("forum_name"),
 	}
