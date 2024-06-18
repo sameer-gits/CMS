@@ -10,9 +10,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var Conn *pgx.Conn
+var Pool *pgxpool.Pool
 
 type Forum struct {
 	ID        uuid.UUID
@@ -33,13 +34,24 @@ func (e *CustomError) Error() string {
 }
 
 func InitDB() error {
-	conn, err := pgx.Connect(context.Background(), databaseURL)
+	config, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Unable to parse database URL: %v\n", err)
 		os.Exit(1)
 	}
+
+	config.MaxConns = 10
+	config.MinConns = 5
+	config.MaxConnIdleTime = 60
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), config)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to create connection pool: %v\n", err)
+		os.Exit(1)
+	}
+
 	fmt.Println("Connected to database")
-	Conn = conn
+	Pool = pool
 	return nil
 }
 
@@ -50,7 +62,7 @@ func selectUser(userID string) (User, error) {
 	`
 	var user User
 
-	err := Conn.QueryRow(context.Background(),
+	err := Pool.QueryRow(context.Background(),
 		selectQuery, userID).Scan(&user.Username, &user.Fullname, &user.Role, &user.Email, &user.ProfileImage)
 	if err != nil {
 		if err == pgx.ErrNoRows {
@@ -96,7 +108,7 @@ func newForum(w http.ResponseWriter, r *http.Request) {
     RETURNING forum_id
     `
 
-	err = Conn.QueryRow(context.Background(), insertQuery, forum.Name, forum.Image, userID).Scan(
+	err = Pool.QueryRow(context.Background(), insertQuery, forum.Name, forum.Image, userID).Scan(
 		&forum.ID)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error Creating Forum: %v", err), serverCode)
@@ -108,7 +120,7 @@ func selectForums() ([]Forum, error) {
     SELECT forum_id, forum_name, forum_image, public, created_at, created_by
     FROM forums
     `
-	rows, err := Conn.Query(context.Background(), selectQuery)
+	rows, err := Pool.Query(context.Background(), selectQuery)
 	if err != nil {
 		return nil, &CustomError{serverCode, fmt.Sprintf("error retrieving forums: %v", err)}
 	}

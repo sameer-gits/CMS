@@ -83,7 +83,7 @@ func register(w http.ResponseWriter, r *http.Request) {
     VALUES ($1, $2, $3, $4, $5)
     RETURNING user_id
     `
-	err = Conn.QueryRow(context.Background(), insertQuery, user.Username, user.Fullname,
+	err = Pool.QueryRow(context.Background(), insertQuery, user.Username, user.Fullname,
 		user.Email, user.ProfileImage, hashedPassword).Scan(&user.UserID)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error register user: %v", err), serverCode)
@@ -131,7 +131,7 @@ func checkPassword(username, password string) (uuid.UUID, error) {
 	var userID uuid.UUID
 	var hashedPassword []byte
 
-	err := Conn.QueryRow(context.Background(), selectQuery, username).Scan(&userID, &hashedPassword)
+	err := Pool.QueryRow(context.Background(), selectQuery, username).Scan(&userID, &hashedPassword)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return uuid.Nil, fmt.Errorf("user not found")

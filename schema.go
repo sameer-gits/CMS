@@ -130,7 +130,7 @@ func createSchema() error {
     CREATE INDEX idx_poll_id_options ON poll_options (poll_id);
     CREATE INDEX idx_poll_id_votes ON poll_votes (poll_id);
     `
-	_, err := Conn.Exec(context.Background(), schema)
+	_, err := Pool.Exec(context.Background(), schema)
 	if err != nil {
 		return fmt.Errorf("faild to make schema: %v", err)
 	}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log"
 	"net/http"
 	"os"
@@ -33,8 +32,11 @@ func init() {
 }
 
 func main() {
-	InitDB()
-	defer Conn.Close(context.Background())
+	if err := InitDB(); err != nil {
+		log.Printf("Failed to initialize database: %v", err)
+	}
+
+	defer Pool.Close()
 	// err := createSchema()
 	// if err != nil {
 	// 	log.Printf("Unable to create schema: %v\n", err)
