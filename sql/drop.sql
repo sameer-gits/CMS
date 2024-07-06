@@ -1,0 +1,21 @@
+DROP TABLE IF EXISTS articles;
+
+DROP TABLE IF EXISTS categories;
+
+DROP TABLE IF EXISTS messages;
+
+DROP TABLE IF EXISTS poll_votes;
+
+DROP TABLE IF EXISTS poll_options;
+
+DROP TABLE IF EXISTS polls;
+
+DROP TABLE IF EXISTS forum_users;
+
+DROP TABLE IF EXISTS forum_admins;
+
+DROP TABLE IF EXISTS forum_mods;
+
+DROP TABLE IF EXISTS forums;
+
+DROP TABLE IF EXISTS users;

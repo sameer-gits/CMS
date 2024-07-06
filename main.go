@@ -2,45 +2,28 @@ package main
 
 import (
 	"log"
-	"net/http"
 	"os"
 
 	"github.com/joho/godotenv"
+	"github.com/sameer-gits/CMS/database"
 )
 
-var (
-	databaseURL string
-	secretKey   string
-	port        string
-)
-
-const (
-	serverCode   = http.StatusInternalServerError
-	unauthorized = http.StatusUnauthorized
-	statusOK     = http.StatusOK
-	badCode      = http.StatusBadRequest
-)
+type ErrorResponse struct {
+	Errors []string `json:"errors"`
+}
 
 func init() {
 	err := godotenv.Load()
 	if err != nil {
 		log.Printf("Error loading .env file")
 	}
-	databaseURL = os.Getenv("DATABASE_URL")
-	secretKey = os.Getenv("SECRET_KEY")
-	port = os.Getenv("PORT")
 }
 
 func main() {
-	if err := InitDB(); err != nil {
-		log.Printf("Failed to initialize database: %v", err)
+	err := database.DbInit(os.Getenv("DATABASE_URL"))
+	if err != nil {
+		log.Fatalf("Database initialization failed: %v", err)
 	}
-
-	defer Pool.Close()
-	// err := createSchema()
-	// if err != nil {
-	// 	log.Printf("Unable to create schema: %v\n", err)
-	// }
-
+	defer database.DbClose()
 	routes()
 }

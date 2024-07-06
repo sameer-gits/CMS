@@ -1,71 +1,34 @@
 package main
 
 import (
-	"html/template"
 	"net/http"
 	"path/filepath"
+	"text/template"
 )
 
-// render template without data
-func renderTempl(w http.ResponseWriter, name ...string) {
-	var templateFiles []string
-	for _, n := range name {
-		templateFiles = append(templateFiles, filepath.Join(views, n))
+func renderhtml(w http.ResponseWriter, data interface{}, errs []error, htmlFilename ...string) {
+	var htmlFilenames []string
+	for _, n := range htmlFilename {
+		htmlFilenames = append(htmlFilenames, filepath.Join("frontend/", n))
 	}
 
-	tmpl, err := template.ParseFiles(templateFiles...)
+	tmpl, err := template.ParseFiles(htmlFilenames...)
 	if err != nil {
-		http.Error(w, "Error parsing template", serverCode)
+		http.Error(w, "Error parsing template: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	err = tmpl.Execute(w, nil)
-	if err != nil {
-		http.Error(w, "Error executing template", serverCode)
-		return
-	}
-}
-
-// render template with data
-func renderTemplData(w http.ResponseWriter, r *http.Request, name ...string) {
-	userID, err := getCookie(r)
-	if err != nil {
-		http.Redirect(w, r, "/logout", unauthorized)
-		return
-	}
-
-	user, err := selectUser(userID)
-	if err != nil {
-		http.Error(w, err.Error(), serverCode)
-		return
-	}
-	forums, err := selectForums()
-	if err != nil {
-		http.Error(w, err.Error(), serverCode)
-		return
-	}
-	var templateFiles []string
-	for _, n := range name {
-		templateFiles = append(templateFiles, filepath.Join(views, n))
-	}
-
-	tmpl, err := template.ParseFiles(templateFiles...)
-	if err != nil {
-		http.Error(w, "Error parsing template", serverCode)
-		return
-	}
-
-	data := struct {
-		User   User
-		Forums []Forum
+	templateData := struct {
+		Data   interface{}
+		Errors []error
 	}{
-		User:   user,
-		Forums: forums,
+		Data:   data,
+		Errors: errs,
 	}
 
-	err = tmpl.Execute(w, data)
+	err = tmpl.Execute(w, templateData)
 	if err != nil {
-		http.Error(w, "Error executing template", serverCode)
+		http.Error(w, "Error executing template: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
