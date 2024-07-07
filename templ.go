@@ -6,7 +6,7 @@ import (
 	"text/template"
 )
 
-func renderhtml(w http.ResponseWriter, data interface{}, errs []error, htmlFilename ...string) {
+func renderHtml(w http.ResponseWriter, data interface{}, errs []error, htmlFilename ...string) {
 	var htmlFilenames []string
 	for _, n := range htmlFilename {
 		htmlFilenames = append(htmlFilenames, filepath.Join("frontend/", n))
