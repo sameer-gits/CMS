@@ -27,11 +27,12 @@ type User struct {
 }
 
 type CreateUserForm struct {
-	Username     string `form:"username" json:"username"`
-	Fullname     string `form:"fullname" json:"fullname"`
-	Email        string `form:"email" json:"email"`
-	Password     string `form:"password" json:"password"`
-	ProfileImage []byte `form:"profile_image,omitempty" json:"profile_image,omitempty"`
+	Username        string `form:"username" json:"username"`
+	Fullname        string `form:"fullname" json:"fullname"`
+	Email           string `form:"email" json:"email"`
+	Password        string `form:"password" json:"password"`
+	ConfirmPassword string `form:"confirmPassword" json:"confirmPassword"`
+	ProfileImage    []byte `form:"profile_image,omitempty" json:"profile_image,omitempty"`
 }
 
 func (u CreateUserForm) createUser() (string, []error) {
@@ -79,10 +80,11 @@ func validateForm(r *http.Request) (CreateUserForm, []error) {
 	var errs []error
 
 	form := CreateUserForm{
-		Username: r.FormValue("username"),
-		Fullname: r.FormValue("fullname"),
-		Email:    r.FormValue("email"),
-		Password: r.FormValue("password"),
+		Username:        r.FormValue("username"),
+		Fullname:        r.FormValue("fullname"),
+		Email:           r.FormValue("email"),
+		Password:        r.FormValue("password"),
+		ConfirmPassword: r.FormValue("confirmPassword"),
 	}
 
 	// Username
@@ -116,8 +118,13 @@ func validateForm(r *http.Request) (CreateUserForm, []error) {
 		errs = append(errs, errors.New("password must be at least 8 characters long and contain at least one uppercase letter, lowercase letter, number and special character"))
 	}
 
+	//Confirm Password
+	if form.ConfirmPassword != form.Password {
+		errs = append(errs, errors.New("password and confirm password not matched"))
+	}
+
 	// Image
-	image, _, err := r.FormFile("profile_image")
+	image, _, err := r.FormFile("profileImage")
 	if err != nil {
 		if err == http.ErrMissingFile {
 			form.ProfileImage = nil
