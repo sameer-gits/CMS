@@ -54,22 +54,24 @@ func (u CreateUserForm) createUser() (string, []error) {
 		u.Username, u.Fullname, u.Email, u.ProfileImage, hashedPassword).Scan(&uuid)
 
 	if err != nil {
-		if pgErr, ok := err.(*pgconn.PgError); ok {
-			switch pgErr.Code {
-			case "23505":
-				if pgErr.ConstraintName == "unique_username" {
-					errs = append(errs, errors.New("username already exists"))
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			if pgErr.Code == "23505" {
+				if pgErr.ConstraintName == "users_username_key" {
+					errs = append(errs, errors.New("username already exists please use different username"))
+					return "", errs
 				}
 
-				if pgErr.ConstraintName == "unique_email" {
-					errs = append(errs, errors.New("email already exists"))
+				if pgErr.ConstraintName == "users_email_key" {
+					errs = append(errs, errors.New("email already exists please use different email"))
+					return "", errs
 				}
-				return "", errs
 			}
 		}
-		errs = append(errs, errors.New("error inserting form data"))
+		errs = append(errs, errors.New("database error"))
 		return "", errs
 	}
+	fmt.Println(uuid)
 	return uuid, nil
 }
 
@@ -87,9 +89,9 @@ func validateForm(r *http.Request) (CreateUserForm, []error) {
 	if strings.TrimSpace(form.Username) == "" {
 		errs = append(errs, errors.New("please provide username"))
 	} else if len(form.Username) < 3 || len(form.Username) > 66 {
-		errs = append(errs, errors.New("username must be between 3 and 66 characters"))
-	} else if !isAlphanumeric(form.Username) {
-		errs = append(errs, errors.New("username must be alphanumeric"))
+		errs = append(errs, errors.New("usernames must be between 3 to 66 characters long and can only contain letters, numbers, -, _ or max 1 dot in between characters"))
+	} else if !isValidUsername(form.Username) {
+		errs = append(errs, errors.New("usernames must be between 3 to 66 characters long and can only contain letters, numbers, -, _ or max 1 dot in between characters"))
 	}
 
 	// Fullname
@@ -97,8 +99,6 @@ func validateForm(r *http.Request) (CreateUserForm, []error) {
 		errs = append(errs, errors.New("please provide fullname"))
 	} else if len(form.Fullname) < 2 || len(form.Fullname) > 66 {
 		errs = append(errs, errors.New("fullname must be between 2 and 66 characters"))
-	} else if !isAlphabetic(form.Fullname) {
-		errs = append(errs, errors.New("fullname must contain only alphabetic characters and spaces"))
 	}
 
 	// Email
@@ -111,9 +111,9 @@ func validateForm(r *http.Request) (CreateUserForm, []error) {
 	if strings.TrimSpace(form.Password) == "" {
 		errs = append(errs, errors.New("please provide password"))
 	} else if len(form.Password) < 8 {
-		errs = append(errs, errors.New("password must be at least 8 characters long"))
+		errs = append(errs, errors.New("password must be at least 8 characters long and contain at least one uppercase letter, lowercase letter, number and special character"))
 	} else if !hasRequiredPasswordChars(form.Password) {
-		errs = append(errs, errors.New("password must contain at least one uppercase letter, one lowercase letter, one number, and one special character"))
+		errs = append(errs, errors.New("password must be at least 8 characters long and contain at least one uppercase letter, lowercase letter, number and special character"))
 	}
 
 	// Image
@@ -142,19 +142,22 @@ func validateForm(r *http.Request) (CreateUserForm, []error) {
 	return form, errs
 }
 
-func isAlphanumeric(s string) bool {
-	for _, r := range s {
-		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+func isValidUsername(s string) bool {
+	periodCount := 0
+
+	for i, r := range s {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_' && r != '.' && r != '-' {
 			return false
 		}
-	}
-	return true
-}
 
-func isAlphabetic(s string) bool {
-	for _, r := range s {
-		if !unicode.IsLetter(r) && !unicode.IsSpace(r) {
-			return false
+		if r == '.' {
+			if i == 0 || i == len(s)-1 {
+				return false // "." cannot be first or last character
+			}
+			periodCount++
+			if periodCount > 1 {
+				return false // more than one "." not allowed
+			}
 		}
 	}
 	return true

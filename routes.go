@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -21,8 +20,10 @@ func routes() {
 	}
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("POST /createuser", createUserHandler)
 	mux.HandleFunc("/", homeHandler)
+	mux.HandleFunc("/login", loginHandler)
+	mux.HandleFunc("GET /404", notFoundHandler)
+	mux.HandleFunc("POST /createuser", createUserHandler)
 
 	log.Println("server running on: http://localhost:" + port)
 	if err := http.ListenAndServe("0.0.0.0:"+port, mux); err != nil {
@@ -30,29 +31,42 @@ func routes() {
 	}
 }
 
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	renderHtml(w, nil, nil, "login.html")
+}
+
+func notFoundHandler(w http.ResponseWriter, r *http.Request) {
+	renderHtml(w, nil, nil, "notFound.html")
+}
+
 func homeHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" || r.Method != "GET" {
+		notFoundHandler(w, r)
+		return
+	}
 	renderHtml(w, nil, nil, "index.html")
 }
 
 func createUserHandler(w http.ResponseWriter, r *http.Request) {
 	var errs []error
 	var userForm CreateUserForm
+	var userID string
 
 	defer func() {
 		if len(errs) > 0 {
-			renderHtml(w, userForm, errs, "index.html")
+			renderHtml(w, userForm, errs, "login.html")
+		} else if len(errs) == 0 {
+			http.Redirect(w, r, "/", http.StatusFound)
 		}
 	}()
 
 	userForm, errs = validateForm(r)
-	if len(errs) > 0 {
+	if errs != nil {
 		w.WriteHeader(badCode)
 		return
 	}
 
-	fmt.Println(userForm)
-
-	userID, errs := userForm.createUser()
+	userID, errs = userForm.createUser()
 	if errs != nil {
 		w.WriteHeader(serverCode)
 		return
@@ -62,14 +76,9 @@ func createUserHandler(w http.ResponseWriter, r *http.Request) {
 		UserID: userID,
 	}
 
-	err := myCookie.createCookie(w)
-	if err != nil {
-		errs = append(errs, err)
+	errs = myCookie.createCookie(w)
+	if errs != nil {
 		w.WriteHeader(serverCode)
 		return
-	}
-
-	if len(errs) < 1 {
-		w.WriteHeader(http.StatusCreated)
 	}
 }
