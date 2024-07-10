@@ -35,7 +35,17 @@ type CreateUserForm struct {
 	ProfileImage    []byte `form:"profile_image,omitempty" json:"profile_image,omitempty"`
 }
 
-func (u CreateUserForm) createUser() (string, []error) {
+type RedisUserTmp struct {
+	Username     string `form:"username" json:"username"`
+	Fullname     string `form:"fullname" json:"fullname"`
+	Email        string `form:"email" json:"email"`
+	EmailOtp     string `form:"email_top" json:"email_top"`
+	Chances      string `form:"chances" json:"chances"`
+	Password     string `form:"password" json:"password"`
+	ProfileImage []byte `form:"profile_image,omitempty" json:"profile_image,omitempty"`
+}
+
+func (u RedisUserTmp) createUser() (string, []error) {
 	var errs []error
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
