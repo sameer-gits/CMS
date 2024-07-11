@@ -1,9 +1,17 @@
 package main
 
 import (
+	"context"
+	"encoding/base64"
+	"errors"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
+	"time"
+
+	"github.com/sameer-gits/CMS/database"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const (
@@ -26,7 +34,7 @@ func routes() {
 	mux.HandleFunc("GET /404", notFoundHandler)
 
 	mux.HandleFunc("POST /createuser", createUserHandler)
-	mux.HandleFunc("POST /verifyuser", verifyUserHandler)
+	// mux.HandleFunc("POST /verifyuser", verifyUserHandler)
 
 	log.Println("server running on: http://localhost:" + port)
 	if err := http.ListenAndServe("0.0.0.0:"+port, mux); err != nil {
@@ -55,14 +63,14 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 
 func createUserHandler(w http.ResponseWriter, r *http.Request) {
 	var errs []error
-	var userForm CreateUserForm
-	var userEmail string
+	var userForm FormUser
+	uCtx := context.Background()
 
 	defer func() {
 		if len(errs) > 0 {
 			renderHtml(w, userForm, errs, "login.html")
 		} else if len(errs) == 0 {
-			http.Redirect(w, r, "/verifyuser", http.StatusFound)
+			http.Redirect(w, r, "/verify", http.StatusFound)
 		}
 	}()
 
@@ -72,48 +80,32 @@ func createUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userEmail, errs = userForm.addTmpUser()
-	if errs != nil {
-		w.WriteHeader(serverCode)
+	hash, err := bcrypt.GenerateFromPassword([]byte(userForm.Password), bcrypt.DefaultCost)
+	if err != nil {
+		errs = append(errs, errors.New("error hashing password"))
 		return
 	}
 
-	// send userEmail to /verify endpoint for autofill and otp verification with email autofill with w
-}
+	hashedPassword := base64.URLEncoding.EncodeToString(hash)
+	Otpgen := rand.Intn(900000) + 100000
 
-func verifyUserHandler(email string) {
-	var errs []error
-	var tmpUser RedisUserTmp
-	var userID string
+	redisUser := RedisUser{
+		Username: userForm.Username,
+		Fullname: userForm.Fullname,
+		Email:    userForm.Email,
+		Otp:      Otpgen,
+		Password: hashedPassword,
+	}
 
-	// defer func() {
-	// 	if len(errs) > 0 {
-	// 		renderHtml(w, nil, errs, "verify.html")
-	// 	} else if len(errs) == 0 {
-	// 		http.Redirect(w, r, "/", http.StatusFound)
-	// 	}
-	// }()
+	tx := database.RedisClient.TxPipeline()
 
-	// give 5 chances with rate limit by incrementing chances by 1 everytime
-	tmpUser, errs := verifyTmpUser(email)
-	if errs != nil {
+	tx.HSet(uCtx, userForm.Email, redisUser)
+	tx.Expire(uCtx, userForm.Email, 2*time.Minute)
+
+	_, err = tx.Exec(uCtx)
+	if err != nil {
+		database.RedisClient.Del(uCtx, userForm.Email)
 		w.WriteHeader(badCode)
-		return
-	}
-
-	userID, errs = tmpUser.createUser()
-	if errs != nil {
-		w.WriteHeader(serverCode)
-		return
-	}
-
-	myCookie := Cookie{
-		UserID: userID,
-	}
-
-	errs = myCookie.createCookie(w)
-	if errs != nil {
-		w.WriteHeader(serverCode)
 		return
 	}
 }

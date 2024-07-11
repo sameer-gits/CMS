@@ -5,9 +5,11 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 )
 
 var Dbpool *pgxpool.Pool
+var RedisClient *redis.Client
 
 func DbInit(dbURL string) error {
 	config, err := pgxpool.ParseConfig(dbURL)
@@ -38,5 +40,30 @@ func DbInit(dbURL string) error {
 func DbClose() {
 	if Dbpool != nil {
 		Dbpool.Close()
+	}
+}
+
+func RedisInit(redisURL string) error {
+	opts, err := redis.ParseURL(redisURL)
+	if err != nil {
+		return fmt.Errorf("unable to run redis: %v", err)
+	}
+
+	client := redis.NewClient(opts)
+	ctx := context.Background()
+
+	err = client.Ping(ctx).Err()
+	if err != nil {
+		return fmt.Errorf("unable to ping redis: %v", err)
+	}
+
+	RedisClient = client
+	fmt.Println("Connected to redis")
+	return nil
+}
+
+func RedisClose() {
+	if RedisClient != nil {
+		RedisClient.Close()
 	}
 }

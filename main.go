@@ -20,10 +20,20 @@ func init() {
 }
 
 func main() {
+	defer func() {
+		database.RedisClose()
+		database.DbClose()
+	}()
+
 	err := database.DbInit(os.Getenv("DATABASE_URL"))
 	if err != nil {
 		log.Fatalf("Database initialization failed: %v", err)
 	}
-	defer database.DbClose()
+
+	err = database.RedisInit(os.Getenv("REDIS_URL"))
+	if err != nil {
+		log.Fatalf("Redis initialization failed: %v", err)
+	}
+
 	routes()
 }

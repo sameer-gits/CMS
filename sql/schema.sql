@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(128) NOT NULL UNIQUE,
     profile_image BYTEA,
     joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    password_hash BYTEA NOT NULL
+    password_hash VARCHAR(80) NOT NULL
 );
 
 -- article category table
