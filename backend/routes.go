@@ -131,9 +131,24 @@ func createUserHandler(w http.ResponseWriter, r *http.Request) {
 		database.RedisClient.Del(ctx, redisUser.Email)
 		return
 	}
+
 	// send OTP to user here
+	sendMailTo := mailTo{
+		from:        os.Getenv("EMAIL"),
+		password:    os.Getenv("EMAIL_PASSWORD"),
+		sendTo:      []string{redisUser.Email},
+		smtpHost:    "smtp.gmail.com",
+		smtpPort:    "587",
+		mailMessage: fmt.Sprintf("Hello your One-Time Password is %d, Valid for 2mins.", redisUser.Otp),
+	}
+
+	err = sendMailTo.sendMail()
+	if err != nil {
+		errs = append(errs, fmt.Errorf("error sending OTP: %v", err))
+	}
 }
 
+// TODO: add regenerate OTP for 3 times also and then cookie encryption
 func verifyUserHandler(w http.ResponseWriter, r *http.Request) {
 	var errs []error
 	var redisUser RedisUser
