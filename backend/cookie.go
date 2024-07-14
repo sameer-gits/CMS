@@ -4,10 +4,12 @@ import (
 	"errors"
 	"net/http"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type Cookie struct {
-	UserID string
+	UserID uuid.UUID
 }
 
 func (c Cookie) createCookie(w http.ResponseWriter) []error {
@@ -16,7 +18,7 @@ func (c Cookie) createCookie(w http.ResponseWriter) []error {
 
 	cookie := http.Cookie{
 		Name:     "Cookie",
-		Value:    c.UserID,
+		Value:    c.UserID.String(), // make this encrypted and base64 in future.
 		Path:     "/",
 		Expires:  time.Now().Add(time.Hour * 24 * 30),
 		MaxAge:   3600 * 24 * 30,

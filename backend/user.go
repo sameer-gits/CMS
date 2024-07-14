@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"regexp"
@@ -9,6 +10,9 @@ import (
 	"unicode"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/redis/go-redis/v9"
+	"github.com/sameer-gits/CMS/database"
 )
 
 type DbUser struct {
@@ -35,11 +39,14 @@ type RedisUser struct {
 	Fullname string `form:"fullname" json:"fullname" redis:"fullname"`
 	Email    string `form:"email" json:"email" redis:"email"`
 	Otp      int    `form:"otp" json:"otp" redis:"otp"`
+	Request  int    `form:"request" json:"request" redis:"request"`
+	Blocked  string `form:"blocked" json:"blocked" redis:"blocked"`
 	Password string `form:"password" json:"password" redis:"password"`
 }
 
 func validateForm(r *http.Request) (FormUser, []error) {
 	var errs []error
+	var dbexists bool
 
 	form := FormUser{
 		Username:        r.FormValue("username"),
@@ -47,6 +54,31 @@ func validateForm(r *http.Request) (FormUser, []error) {
 		Email:           r.FormValue("email"),
 		Password:        r.FormValue("password"),
 		ConfirmPassword: r.FormValue("confirmPassword"),
+	}
+
+	// check in database if username or email already exists
+	checkFormData := `
+	SELECT EXISTS (SELECT 1 FROM users WHERE username = $1 OR email = $2);
+	`
+	err := database.Dbpool.QueryRow(context.Background(), checkFormData,
+		form.Username, form.Email).Scan(&dbexists)
+	if err != nil {
+		errs = append(errs, errors.New("error checking database for username or email"))
+	} else if dbexists {
+		errs = append(errs, errors.New("username or email already exists in db"))
+	}
+	ctx := context.Background()
+
+	// check in redis if username or email already exists
+	var redisexists string
+	redisexists, err = database.RedisClient.HGet(ctx, form.Email, "username").Result()
+	if err == redis.Nil {
+		// user does not exists so continue
+	} else if err != nil {
+		errs = append(errs, errors.New("redis database error"))
+	} else if redisexists != "" {
+		errs = append(errs, errors.New("username or email already exists redis"))
+
 	}
 
 	// Username
@@ -74,10 +106,10 @@ func validateForm(r *http.Request) (FormUser, []error) {
 	// Password
 	if strings.TrimSpace(form.Password) == "" {
 		errs = append(errs, errors.New("please provide password"))
-	} else if len(form.Password) < 8 {
-		errs = append(errs, errors.New("password must be at least 8 characters long and contain at least one uppercase letter, lowercase letter, number and special character"))
+	} else if len(form.Password) < 8 || len(form.Password) > 18 {
+		errs = append(errs, errors.New("password must be between 8 to 18 characters and contain at least one uppercase letter, lowercase letter, number and special character"))
 	} else if !hasRequiredPasswordChars(form.Password) {
-		errs = append(errs, errors.New("password must be at least 8 characters long and contain at least one uppercase letter, lowercase letter, number and special character"))
+		errs = append(errs, errors.New("password must be between 8 to 18 characters and contain at least one uppercase letter, lowercase letter, number and special character"))
 	}
 
 	//Confirm Password
@@ -126,37 +158,36 @@ func hasRequiredPasswordChars(password string) bool {
 	return hasUpper && hasLower && hasNumber && hasSpecial
 }
 
-// func (u RedisUser) createUser() (string, []error) {
-// 	var errs []error
+func (u RedisUser) createUser() (uuid.UUID, []error) {
+	var errs []error
 
-// 	var uuid string
-// 	createU := `
-// 	INSERT INTO users (username, fullname, email, password_hash)
-//     VALUES ($1, $2, $3, $4, $5)
-//     RETURNING user_id
-// 	`
+	var userID uuid.UUID
+	createU := `
+	INSERT INTO users (username, fullname, email, password_hash)
+    VALUES ($1, $2, $3, $4)
+    RETURNING user_id
+	`
 
-// 	err := database.Dbpool.QueryRow(context.Background(), createU,
-// 		u.Username, u.Fullname, u.Email, u.Password).Scan(&uuid)
+	err := database.Dbpool.QueryRow(context.Background(), createU,
+		u.Username, u.Fullname, u.Email, u.Password).Scan(&userID)
 
-// 	if err != nil {
-// 		var pgErr *pgconn.PgError
-// 		if errors.As(err, &pgErr) {
-// 			if pgErr.Code == "23505" {
-// 				if pgErr.ConstraintName == "users_username_key" {
-// 					errs = append(errs, errors.New("username already exists please use different username"))
-// 					return "", errs
-// 				}
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			if pgErr.Code == "23505" {
+				if pgErr.ConstraintName == "users_username_key" {
+					errs = append(errs, errors.New("username already exists please use different username"))
+					return uuid.Nil, errs
+				}
 
-// 				if pgErr.ConstraintName == "users_email_key" {
-// 					errs = append(errs, errors.New("email already exists please use different email"))
-// 					return "", errs
-// 				}
-// 			}
-// 		}
-// 		errs = append(errs, errors.New("database error"))
-// 		return "", errs
-// 	}
-// 	fmt.Println(uuid)
-// 	return uuid, nil
-// }
+				if pgErr.ConstraintName == "users_email_key" {
+					errs = append(errs, errors.New("email already exists please use different email"))
+					return uuid.Nil, errs
+				}
+			}
+		}
+		errs = append(errs, errors.New("database error"))
+		return uuid.Nil, errs
+	}
+	return userID, nil
+}

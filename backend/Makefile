@@ -1,4 +1,4 @@
-include .env
+include ../.env
 
 TMP=tmp
 CREATE_TABLE=sql/schema.sql
@@ -15,7 +15,7 @@ conn:
 	chcp 1252
 	psql -d $(DATABASE_URL)
 
-create:
+database:
 	chcp 1252
 	psql -d $(DATABASE_URL) -f $(CREATE_TABLE)
 
@@ -24,4 +24,4 @@ drop:
 	psql -d $(DATABASE_URL) -f $(DROP_TABLE)
 
 .SILENT:
-.PHONY: run tmp conn drop
+.PHONY: run tmp conn database drop

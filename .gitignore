@@ -20,6 +20,9 @@
 # Go workspace file
 go.work
 tmp/
+frontend/public/scripts
+frontend/public/styles
 .env
 .env.*
 .env.local
+node_modules/

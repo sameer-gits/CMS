@@ -9,7 +9,7 @@ import (
 func renderHtml(w http.ResponseWriter, data interface{}, errs []error, htmlFilename ...string) {
 	var htmlFilenames []string
 	for _, n := range htmlFilename {
-		htmlFilenames = append(htmlFilenames, filepath.Join("frontend/", n))
+		htmlFilenames = append(htmlFilenames, filepath.Join("../frontend/views/", n))
 	}
 
 	tmpl, err := template.ParseFiles(htmlFilenames...)
