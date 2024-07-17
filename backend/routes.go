@@ -78,7 +78,6 @@ func createUserHandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(badCode)
 			renderHtml(w, userForm, errs, "login.html")
 		} else if len(errs) == 0 {
-			fmt.Println("otp:", redisUser.Otp)
 			renderHtml(w, userForm, errs, "verify.html")
 		}
 	}()
@@ -132,14 +131,23 @@ func createUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	headers := "From: " + os.Getenv("EMAIL_HEADER") + "\r\n" +
+		"To: " + redisUser.Email + "\r\n" +
+		"Subject: Your One-Time Password\r\n" +
+		"\r\n"
+
+	body := fmt.Sprintf("Hello your One-Time Password is %d, Valid for 2mins.", redisUser.Otp)
+
+	message := headers + body
+
 	// send OTP to user here
 	sendMailTo := mailTo{
-		from:        os.Getenv("EMAIL"),
-		password:    os.Getenv("EMAIL_PASSWORD"),
+		from:        os.Getenv("EMAIL_SMTP"),
+		password:    os.Getenv("EMAIL_SMTP_PASSWORD"),
 		sendTo:      []string{redisUser.Email},
-		smtpHost:    "smtp.gmail.com",
+		smtpHost:    "smtp-relay.brevo.com",
 		smtpPort:    "587",
-		mailMessage: fmt.Sprintf("Hello your One-Time Password is %d, Valid for 2mins.", redisUser.Otp),
+		mailMessage: message,
 	}
 
 	err = sendMailTo.sendMail()
