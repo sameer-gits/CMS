@@ -33,10 +33,12 @@ func routes() {
 	mux.HandleFunc("/", homeHandler)
 	mux.HandleFunc("/login", loginHandler)
 	mux.HandleFunc("/404", notFoundHandler)
-	mux.HandleFunc("/verify", verifyHandler)
+	mux.HandleFunc("/verify", redirectLoginHandler)
+	mux.HandleFunc("/resendotp", redirectLoginHandler)
 
 	mux.HandleFunc("POST /login", createUserHandler)
 	mux.HandleFunc("POST /verify", verifyUserHandler)
+	mux.HandleFunc("POST /resendotp", resendOtpHandler)
 
 	localFlies := http.FileServer(http.Dir("../frontend/public"))
 	mux.Handle("/public/", http.StripPrefix("/public/", localFlies))
@@ -51,7 +53,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	renderHtml(w, nil, nil, "login.html")
 }
 
-func verifyHandler(w http.ResponseWriter, r *http.Request) {
+func redirectLoginHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusFound)
 }
 
@@ -160,26 +162,29 @@ func createUserHandler(w http.ResponseWriter, r *http.Request) {
 func verifyUserHandler(w http.ResponseWriter, r *http.Request) {
 	var errs []error
 	var redisUser RedisUser
-	var data struct {
-		Email string
-	}
+	var formUser FormUser
 
-	email := r.FormValue("email")
+	formUser.Email = r.FormValue("email")
 	userOtp := r.FormValue("otp")
-	data.Email = email
 
 	defer func() {
 		if len(errs) > 0 {
-			renderHtml(w, data, errs, "verify.html")
+			renderHtml(w, formUser, errs, "verify.html")
 		} else if len(errs) == 0 {
 			http.Redirect(w, r, "/", http.StatusFound)
 		}
 	}()
 
 	ctx := context.Background()
-	err := database.RedisClient.HGetAll(ctx, email).Scan(&redisUser)
+	err := database.RedisClient.HGetAll(ctx, formUser.Email).Scan(&redisUser)
 	if err != nil {
 		errs = append(errs, errors.New("error matching OTP, try again"))
+		return
+	}
+
+	if redisUser.Email == "" {
+		formUser.Email = ""
+		errs = append(errs, errors.New("error no email is register maybe timeout try registering again"))
 		return
 	}
 
@@ -194,7 +199,7 @@ func verifyUserHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		errs = append(errs, errors.New("max attempts exceeded try again after 1 day"))
+		errs = append(errs, errors.New("max attempts already exceeded: user blocked for 1 day"))
 		return
 	}
 
@@ -229,4 +234,88 @@ func verifyUserHandler(w http.ResponseWriter, r *http.Request) {
 		errs = append(errs, errors.New("error creating cookie try logging in or try again creating account"))
 		return
 	}
+}
+
+func resendOtpHandler(w http.ResponseWriter, r *http.Request) {
+	var errs []error
+	var redisUser RedisUser
+	var formUser FormUser
+
+	formUser.Email = r.FormValue("email")
+
+	defer func() {
+		if len(errs) > 0 {
+			renderHtml(w, formUser, errs, "verify.html")
+		} else if len(errs) == 0 {
+			formUser.Message = "New OTP sent, Please check your email."
+			renderHtml(w, formUser, errs, "verify.html")
+		}
+	}()
+
+	ctx := context.Background()
+	err := database.RedisClient.HGetAll(ctx, formUser.Email).Scan(&redisUser)
+	if err != nil {
+		errs = append(errs, errors.New("error sending new OTP, try again"))
+		return
+	}
+
+	if redisUser.Request == 5 {
+		tx := database.RedisClient.TxPipeline()
+
+		tx.HSet(ctx, redisUser.Email, "blocked", "true").Err()
+		tx.Expire(ctx, redisUser.Email, 24*time.Hour).Err()
+
+		_, err = tx.Exec(ctx)
+		if err != nil {
+			return
+		}
+
+		errs = append(errs, errors.New("max attempts already exceeded: user blocked for 1 day"))
+		return
+	}
+
+	redisUser.Request++
+	rd := rand.New(rand.NewSource(time.Now().Unix()))
+	otpGen := rd.Intn(899999) + 100000
+
+	tx := database.RedisClient.TxPipeline()
+	tx.HSet(ctx, redisUser.Email, "otp", otpGen).Err()
+	tx.HSet(ctx, redisUser.Email, "request", redisUser.Request).Err()
+	tx.Expire(ctx, redisUser.Email, 2*time.Minute).Err()
+	_, err = tx.Exec(ctx)
+	if err != nil {
+		return
+	}
+
+	if redisUser.Email == "" {
+		formUser.Email = ""
+		errs = append(errs, errors.New("error no email is register maybe timeout try registering again"))
+		return
+	}
+
+	headers := "From: " + os.Getenv("EMAIL_HEADER") + "\r\n" +
+		"To: " + redisUser.Email + "\r\n" +
+		"Subject: Your New One-Time Password\r\n" +
+		"\r\n"
+
+	body := fmt.Sprintf("Hello your New One-Time Password is %d, Valid for 2mins.", otpGen)
+
+	message := headers + body
+
+	// send OTP to user here
+	sendMailTo := mailTo{
+		from:        os.Getenv("EMAIL_SMTP"),
+		password:    os.Getenv("EMAIL_SMTP_PASSWORD"),
+		sendTo:      []string{redisUser.Email},
+		smtpHost:    "smtp-relay.brevo.com",
+		smtpPort:    "587",
+		mailMessage: message,
+	}
+
+	err = sendMailTo.sendMail()
+	if err != nil {
+		fmt.Println(redisUser.Email)
+		errs = append(errs, fmt.Errorf("error sending new OTP: %v", err))
+	}
+
 }

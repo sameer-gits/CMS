@@ -10,16 +10,20 @@
   <body>
     <div>
       <h1>User Registration</h1>
-      <form action="/verify" method="POST" enctype="multipart/form-data">
+      <form method="POST" enctype="multipart/form-data">
         <input id="email" name="email" value="{{.Data.Email}}" hidden />
         <div class="p-4">
           <label for="otp">OTP:</label>
-          <input type="number" id="otp" name="otp" pattern="\d{6}" required />
+          <input type="number" id="otp" name="otp" />
         </div>
         <div>
-          <button type="submit">Verify</button>
+          <button type="submit" formaction="/verify">Verify</button>
+          <button type="submit" formaction="/resendotp">Resend OTP</button>
         </div>
       </form>
+      {{if .Data.Message}}
+      <p>{{.Data.Message}}</p>
+      {{end}}
     </div>
     {{if .Errors}}
     <ul>

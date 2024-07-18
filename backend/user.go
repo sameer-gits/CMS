@@ -32,6 +32,7 @@ type FormUser struct {
 	Email           string `form:"email" json:"email"`
 	Password        string `form:"password" json:"password"`
 	ConfirmPassword string `form:"confirmPassword" json:"confirmPassword"`
+	Message         string `form:"message" json:"message"`
 }
 
 type RedisUser struct {
