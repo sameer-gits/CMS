@@ -17,6 +17,7 @@
             id="username"
             name="username"
             maxlength="64"
+            value="{{.Data.Username}}"
             required
           />
         </div>
@@ -27,6 +28,7 @@
             id="fullname"
             name="fullname"
             maxlength="64"
+            value="{{.Data.Fullname}}"
             required
           />
         </div>
@@ -37,12 +39,19 @@
             id="email"
             name="email"
             maxlength="128"
+            value="{{.Data.Email}}"
             required
           />
         </div>
         <div>
           <label for="password">Password:</label>
-          <input type="password" id="password" name="password" required />
+          <input
+            type="password"
+            id="password"
+            name="password"
+            value="{{.Data.Password}}"
+            required
+          />
         </div>
         <div>
           <label for="confirmPassword">Corfirm Password:</label>
@@ -50,6 +59,7 @@
             type="password"
             id="confirmPassword"
             name="confirmPassword"
+            value="{{.Data.ConfirmPassword}}"
             required
           />
         </div>
