@@ -50,7 +50,8 @@ func routes() {
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
-	renderHtml(w, nil, nil, "login.html")
+	var formUser FormUser
+	renderHtml(w, formUser, nil, "login.html")
 }
 
 func redirectLoginHandler(w http.ResponseWriter, r *http.Request) {
