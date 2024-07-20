@@ -30,7 +30,7 @@ func main() {
 		log.Fatalf("Database initialization failed: %v", err)
 	}
 
-	err = database.RedisInit(os.Getenv("REDIS_URL"))
+	err = database.RedisInit(os.Getenv("REDIS_URL_0"), os.Getenv("REDIS_URL_1"))
 	if err != nil {
 		log.Fatalf("Redis initialization failed: %v", err)
 	}

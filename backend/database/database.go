@@ -9,7 +9,13 @@ import (
 )
 
 var Dbpool *pgxpool.Pool
-var RedisClient *redis.Client
+
+type RedisClients struct {
+	Client0 *redis.Client
+	Client1 *redis.Client
+}
+
+var RedisAllClients RedisClients
 
 func DbInit(dbURL string) error {
 	config, err := pgxpool.ParseConfig(dbURL)
@@ -43,27 +49,48 @@ func DbClose() {
 	}
 }
 
-func RedisInit(redisURL string) error {
-	opts, err := redis.ParseURL(redisURL)
+func RedisInit(redisURL ...string) error {
+	opts0, err := redis.ParseURL(redisURL[0])
 	if err != nil {
 		return fmt.Errorf("unable to run redis: %v", err)
 	}
 
-	client := redis.NewClient(opts)
+	client0 := redis.NewClient(opts0)
 	ctx := context.Background()
 
-	err = client.Ping(ctx).Err()
+	err = client0.Ping(ctx).Err()
 	if err != nil {
 		return fmt.Errorf("unable to ping redis: %v", err)
 	}
 
-	RedisClient = client
-	fmt.Println("Connected to redis")
+	RedisAllClients.Client0 = client0
+	fmt.Println("Connected to redis 0")
+
+	//-----------
+
+	opts2, err := redis.ParseURL(redisURL[0])
+	if err != nil {
+		return fmt.Errorf("unable to run redis: %v", err)
+	}
+
+	client1 := redis.NewClient(opts2)
+	ctx2 := context.Background()
+
+	err = client0.Ping(ctx2).Err()
+	if err != nil {
+		return fmt.Errorf("unable to ping redis: %v", err)
+	}
+
+	RedisAllClients.Client1 = client1
+	fmt.Println("Connected to redis 1")
 	return nil
 }
 
 func RedisClose() {
-	if RedisClient != nil {
-		RedisClient.Close()
+	if RedisAllClients.Client0 != nil {
+		RedisAllClients.Client0.Close()
+	}
+	if RedisAllClients.Client1 != nil {
+		RedisAllClients.Client1.Close()
 	}
 }

@@ -72,7 +72,7 @@ func validateForm(r *http.Request) (FormUser, []error) {
 
 	// check in redis if username or email already exists
 	var redisexists string
-	redisexists, err = database.RedisClient.HGet(ctx, form.Email, "username").Result()
+	redisexists, err = database.RedisAllClients.Client0.HGet(ctx, form.Email, "username").Result()
 	if err == redis.Nil {
 		// user does not exists so continue
 	} else if err != nil {

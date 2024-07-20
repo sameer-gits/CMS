@@ -1,9 +1,15 @@
 package main
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
-	"time"
+	"os"
 
 	"github.com/google/uuid"
 )
@@ -12,26 +18,108 @@ type Cookie struct {
 	UserID uuid.UUID
 }
 
-func (c Cookie) createCookie(w http.ResponseWriter) []error {
-	var errs []error
-	err := errors.New("cookie value too long")
+var cookieName = "cookie"
 
-	cookie := http.Cookie{
-		Name:     "Cookie",
-		Value:    c.UserID.String(), // make this encrypted and base64 in future.
-		Path:     "/",
-		Expires:  time.Now().Add(time.Hour * 24 * 30),
-		MaxAge:   3600 * 24 * 30,
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteLaxMode,
+func (c Cookie) createCookie(w http.ResponseWriter) error {
+	cookieVal, err := c.encryptCookie()
+	if err != nil {
+		return err
 	}
 
-	if len(cookie.String()) > 4096 {
-		errs = append(errs, err)
-		return errs
+	cookie := http.Cookie{
+		Name:     cookieName,
+		Value:    cookieVal,
+		Path:     "/",
+		MaxAge:   3600 * 24 * 15,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
 	}
 
 	http.SetCookie(w, &cookie)
 	return nil
+}
+
+func deleteCookie(w http.ResponseWriter, r *http.Request) {
+	cookie := http.Cookie{
+		Name:   cookieName,
+		MaxAge: -1,
+		Path:   "/",
+	}
+	http.SetCookie(w, &cookie)
+	http.Redirect(w, r, "/login", http.StatusFound)
+}
+
+func (c Cookie) encryptCookie() (string, error) {
+	block, err := aes.NewCipher([]byte(os.Getenv("SECRET_KEY")))
+	if err != nil {
+		return "", errors.New("failed to create cipher")
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", errors.New("failed to create GCM")
+	}
+
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", errors.New("failed to create nonce")
+	}
+
+	encryptedData := gcm.Seal(nonce, nonce, []byte(c.UserID.String()), nil)
+	return base64.URLEncoding.EncodeToString(encryptedData), nil
+}
+
+func decryptCookie(cVal string) (string, error) {
+	encryptedData, err := base64Decode(cVal)
+	if err != nil {
+		return "", errors.New("failed to decode cookie")
+	}
+
+	block, err := aes.NewCipher([]byte(os.Getenv("SECRET_KEY")))
+	if err != nil {
+		return "", errors.New("failed to decrypt cookie block")
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", errors.New("failed to get decrypt cookie gcm")
+	}
+
+	nonceSize := gcm.NonceSize()
+	if len(encryptedData) < nonceSize {
+		return "", errors.New("failed to decrypt cookie nonce")
+	}
+
+	nonce, ciphertext := encryptedData[:nonceSize], encryptedData[nonceSize:]
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return "", errors.New("failed to decrypt cookie as plaintext")
+	}
+
+	return string(plaintext), nil
+}
+
+func getCookie(r *http.Request) (uuid.UUID, error) {
+	c, err := r.Cookie(cookieName)
+	if err != nil {
+		return uuid.Nil, errors.New("failed to get cookie")
+	}
+	uID, err := decryptCookie(c.Value)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("invalid cookie: %w", err)
+	}
+	userID, err := uuid.Parse(uID)
+	if err != nil {
+		return uuid.Nil, errors.New("invalid cookie type")
+	}
+	return userID, nil
+}
+
+func base64Decode(input string) ([]byte, error) {
+	value, err := base64.URLEncoding.DecodeString(input)
+	if err != nil {
+		return []byte{}, err
+	}
+	return value, nil
 }

@@ -90,7 +90,7 @@ func createUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := database.RedisClient.HMGet(ctx, userForm.Email, userForm.Email, "request").Scan(&redisUser)
+	err := database.RedisAllClients.Client0.HMGet(ctx, userForm.Email, userForm.Email, "request").Scan(&redisUser)
 	if err != nil {
 		errs = append(errs, errors.New("error creating user try again"))
 		return
@@ -123,14 +123,14 @@ func createUserHandler(w http.ResponseWriter, r *http.Request) {
 		Password: hashedPassword,
 	}
 
-	tx := database.RedisClient.TxPipeline()
+	tx := database.RedisAllClients.Client0.TxPipeline()
 
 	tx.HSet(ctx, redisUser.Email, redisUser).Err()
 	tx.Expire(ctx, redisUser.Email, 2*time.Minute).Err()
 
 	_, err = tx.Exec(ctx)
 	if err != nil {
-		database.RedisClient.Del(ctx, redisUser.Email)
+		database.RedisAllClients.Client0.Del(ctx, redisUser.Email)
 		return
 	}
 
@@ -177,7 +177,7 @@ func verifyUserHandler(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	ctx := context.Background()
-	err := database.RedisClient.HGetAll(ctx, formUser.Email).Scan(&redisUser)
+	err := database.RedisAllClients.Client0.HGetAll(ctx, formUser.Email).Scan(&redisUser)
 	if err != nil {
 		errs = append(errs, errors.New("error matching OTP, try again"))
 		return
@@ -190,7 +190,7 @@ func verifyUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if redisUser.Request == 5 {
-		tx := database.RedisClient.TxPipeline()
+		tx := database.RedisAllClients.Client0.TxPipeline()
 
 		tx.HSet(ctx, redisUser.Email, "blocked", "true").Err()
 		tx.Expire(ctx, redisUser.Email, 24*time.Hour).Err()
@@ -207,7 +207,7 @@ func verifyUserHandler(w http.ResponseWriter, r *http.Request) {
 	redisUser.Request++
 
 	if userOtp != strconv.Itoa(redisUser.Otp) {
-		err = database.RedisClient.HSet(ctx, redisUser.Email, "request", redisUser.Request).Err()
+		err = database.RedisAllClients.Client0.HSet(ctx, redisUser.Email, "request", redisUser.Request).Err()
 		if err != nil {
 			errs = append(errs, errors.New("wrong OTP, try again"))
 			return
@@ -221,16 +221,16 @@ func verifyUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = database.RedisClient.Del(ctx, redisUser.Email).Err()
+	err = database.RedisAllClients.Client0.Del(ctx, redisUser.Email).Err()
 	if err != nil {
 		errs = append(errs, errors.New("error removing temporary data"))
 	}
 
-	ck := Cookie{
+	c := Cookie{
 		UserID: userID,
 	}
 
-	ck.createCookie(w)
+	c.createCookie(w)
 	if errs != nil {
 		errs = append(errs, errors.New("error creating cookie try logging in or try again creating account"))
 		return
@@ -254,14 +254,14 @@ func resendOtpHandler(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	ctx := context.Background()
-	err := database.RedisClient.HGetAll(ctx, formUser.Email).Scan(&redisUser)
+	err := database.RedisAllClients.Client0.HGetAll(ctx, formUser.Email).Scan(&redisUser)
 	if err != nil {
 		errs = append(errs, errors.New("error sending new OTP, try again"))
 		return
 	}
 
 	if redisUser.Request == 5 {
-		tx := database.RedisClient.TxPipeline()
+		tx := database.RedisAllClients.Client0.TxPipeline()
 
 		tx.HSet(ctx, redisUser.Email, "blocked", "true").Err()
 		tx.Expire(ctx, redisUser.Email, 24*time.Hour).Err()
@@ -279,7 +279,7 @@ func resendOtpHandler(w http.ResponseWriter, r *http.Request) {
 	rd := rand.New(rand.NewSource(time.Now().Unix()))
 	otpGen := rd.Intn(899999) + 100000
 
-	tx := database.RedisClient.TxPipeline()
+	tx := database.RedisAllClients.Client0.TxPipeline()
 	tx.HSet(ctx, redisUser.Email, "otp", otpGen).Err()
 	tx.HSet(ctx, redisUser.Email, "request", redisUser.Request).Err()
 	tx.Expire(ctx, redisUser.Email, 2*time.Minute).Err()
