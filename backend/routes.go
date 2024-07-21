@@ -32,6 +32,7 @@ func routes() {
 
 	mux.HandleFunc("/", homeHandler)
 	mux.HandleFunc("/login", loginHandler)
+	mux.HandleFunc("/logout", deleteCookieHandler)
 	mux.HandleFunc("/404", notFoundHandler)
 	mux.HandleFunc("/verify", redirectLoginHandler)
 	mux.HandleFunc("/resendotp", redirectLoginHandler)

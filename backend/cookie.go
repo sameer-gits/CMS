@@ -40,7 +40,7 @@ func (c Cookie) createCookie(w http.ResponseWriter) error {
 	return nil
 }
 
-func deleteCookie(w http.ResponseWriter, r *http.Request) {
+func deleteCookieHandler(w http.ResponseWriter, r *http.Request) {
 	cookie := http.Cookie{
 		Name:   cookieName,
 		MaxAge: -1,

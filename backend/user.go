@@ -79,7 +79,6 @@ func validateForm(r *http.Request) (FormUser, []error) {
 		errs = append(errs, errors.New("redis database error"))
 	} else if redisexists != "" {
 		errs = append(errs, errors.New("username or email already exists redis"))
-
 	}
 
 	// Username
