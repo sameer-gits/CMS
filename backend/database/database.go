@@ -52,15 +52,15 @@ func DbClose() {
 func RedisInit(redisURL ...string) error {
 	opts0, err := redis.ParseURL(redisURL[0])
 	if err != nil {
-		return fmt.Errorf("unable to run redis: %v", err)
+		return fmt.Errorf("unable to run redis0: %v", err)
 	}
 
 	client0 := redis.NewClient(opts0)
-	ctx := context.Background()
+	ctx0 := context.Background()
 
-	err = client0.Ping(ctx).Err()
+	err = client0.Ping(ctx0).Err()
 	if err != nil {
-		return fmt.Errorf("unable to ping redis: %v", err)
+		return fmt.Errorf("unable to ping redis0: %v", err)
 	}
 
 	RedisAllClients.Client0 = client0
@@ -68,17 +68,17 @@ func RedisInit(redisURL ...string) error {
 
 	//-----------
 
-	opts2, err := redis.ParseURL(redisURL[0])
+	opts1, err := redis.ParseURL(redisURL[1])
 	if err != nil {
-		return fmt.Errorf("unable to run redis: %v", err)
+		return fmt.Errorf("unable to run redis1: %v", err)
 	}
 
-	client1 := redis.NewClient(opts2)
-	ctx2 := context.Background()
+	client1 := redis.NewClient(opts1)
+	ctx1 := context.Background()
 
-	err = client0.Ping(ctx2).Err()
+	err = client1.Ping(ctx1).Err()
 	if err != nil {
-		return fmt.Errorf("unable to ping redis: %v", err)
+		return fmt.Errorf("unable to ping redis1: %v", err)
 	}
 
 	RedisAllClients.Client1 = client1
