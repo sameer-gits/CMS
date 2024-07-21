@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -16,22 +17,22 @@ import (
 )
 
 type DbUser struct {
-	UserID       uuid.UUID `form:"user_id" json:"user_id"`
-	Username     string    `form:"username" json:"username"`
-	Fullname     string    `form:"fullname" json:"fullname"`
-	Role         string    `form:"role" json:"role"`
-	JoinedAt     time.Time `form:"joined_at" json:"joined_at"`
-	Email        string    `form:"email" json:"email"`
-	Password     string    `form:"password" json:"password"`
-	ProfileImage []byte    `form:"profile_image,omitempty" json:"profile_image,omitempty"`
+	UserID       uuid.UUID `form:"user_id" json:"user_id" redis:"user_id"`
+	Username     string    `form:"username" json:"username" redis:"username"`
+	Fullname     string    `form:"fullname" json:"fullname" redis:"fullname"`
+	Role         string    `form:"role" json:"role" redis:"role"`
+	JoinedAt     time.Time `form:"joined_at" json:"joined_at" redis:"joined_at"`
+	Email        string    `form:"email" json:"email" redis:"email"`
+	Password     string    `form:"password" json:"password" redis:"password"`
+	ProfileImage []byte    `form:"profile_image,omitempty" json:"profile_image,omitempty" redis:"profile_image"`
 }
 
 type FormUser struct {
-	Username        string `form:"username" json:"username"`
-	Fullname        string `form:"fullname" json:"fullname"`
-	Email           string `form:"email" json:"email"`
-	Password        string `form:"password" json:"password"`
-	ConfirmPassword string `form:"confirmPassword" json:"confirmPassword"`
+	Username        string `form:"username" json:"username" redis:"username"`
+	Fullname        string `form:"fullname" json:"fullname" redis:"fullname"`
+	Email           string `form:"email" json:"email" redis:"email"`
+	Password        string `form:"password" json:"password" redis:"password"`
+	ConfirmPassword string `form:"confirm_password" json:"confirm_password"`
 	Message         string `form:"message" json:"message"`
 }
 
@@ -190,4 +191,63 @@ func (u RedisUser) createUser() (uuid.UUID, []error) {
 		return uuid.Nil, errs
 	}
 	return userID, nil
+}
+
+func userInfoMiddleware(r *http.Request) (DbUser, error) {
+	var user DbUser
+	ctx := context.Background()
+	userID, err := getCookie(r)
+	if err != nil {
+		return DbUser{}, err
+	}
+
+	// Check Redis 1 if the user is there
+	err = database.RedisAllClients.Client1.HGetAll(ctx, userID.String()).Scan(&user)
+	if user.Email != "" {
+		// if user found in Redis, return
+		_ = err
+		return user, nil
+	}
+
+	// Check if user exists in main DB
+	getUser := `
+	SELECT username, fullname, role, joined_at, email, profile_image
+	FROM users WHERE user_id = $1;
+	`
+	err = database.Dbpool.QueryRow(ctx, getUser, userID).Scan(
+		&user.Username,
+		&user.Fullname,
+		&user.Role,
+		&user.JoinedAt,
+		&user.Email,
+		&user.ProfileImage,
+	)
+
+	if err != nil {
+		return DbUser{}, err
+	}
+
+	// add user details in Redis 1 for future
+	tx := database.RedisAllClients.Client1.TxPipeline()
+	tmpUser := map[string]interface{}{
+		"username":      user.Username,
+		"fullname":      user.Fullname,
+		"role":          user.Role,
+		"joined_at":     user.JoinedAt,
+		"email":         user.Email,
+		"profile_image": user.ProfileImage,
+	}
+
+	tx.HSet(ctx, userID.String(), tmpUser).Err()
+	tx.Expire(ctx, userID.String(), 15*time.Minute).Err()
+
+	_, err = tx.Exec(ctx)
+	if err != nil {
+		database.RedisAllClients.Client1.Del(ctx, userID.String())
+		log.Println(2)
+		return DbUser{}, err
+	}
+	user.UserID = uuid.Nil
+	log.Println(3)
+	return user, nil
 }

@@ -36,6 +36,10 @@ func (c Cookie) createCookie(w http.ResponseWriter) error {
 		SameSite: http.SameSiteStrictMode,
 	}
 
+	if len(cookie.String()) > 4096 {
+		return errors.New("cookie value max size exceeded")
+	}
+
 	http.SetCookie(w, &cookie)
 	return nil
 }
@@ -100,6 +104,7 @@ func decryptCookie(cVal string) (string, error) {
 	return string(plaintext), nil
 }
 
+// Custom errors are not going to user currently just logging them out for now
 func getCookie(r *http.Request) (uuid.UUID, error) {
 	c, err := r.Cookie(cookieName)
 	if err != nil {

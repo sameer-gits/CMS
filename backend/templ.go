@@ -14,7 +14,7 @@ func renderHtml(w http.ResponseWriter, data interface{}, errs []error, htmlFilen
 
 	tmpl, err := template.ParseFiles(htmlFilenames...)
 	if err != nil {
-		http.Error(w, "Error parsing template: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Error parsing template: "+err.Error(), serverCode)
 		return
 	}
 
@@ -28,7 +28,7 @@ func renderHtml(w http.ResponseWriter, data interface{}, errs []error, htmlFilen
 
 	err = tmpl.Execute(w, templateData)
 	if err != nil {
-		http.Error(w, "Error executing template: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Error executing template: "+err.Error(), serverCode)
 		return
 	}
 }

@@ -33,6 +33,7 @@ func routes() {
 	mux.HandleFunc("/", homeHandler)
 	mux.HandleFunc("/login", loginHandler)
 	mux.HandleFunc("/logout", deleteCookieHandler)
+	mux.HandleFunc("/protected", protectedHandler)
 	mux.HandleFunc("/404", notFoundHandler)
 	mux.HandleFunc("/verify", redirectLoginHandler)
 	mux.HandleFunc("/resendotp", redirectLoginHandler)
@@ -53,6 +54,15 @@ func routes() {
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	var formUser FormUser
 	renderHtml(w, formUser, nil, "login.html")
+}
+
+func protectedHandler(w http.ResponseWriter, r *http.Request) {
+	user, err := userInfoMiddleware(r)
+	if err != nil {
+		http.Redirect(w, r, "/logout", http.StatusFound)
+		return
+	}
+	renderHtml(w, user, nil, "protected.html")
 }
 
 func redirectLoginHandler(w http.ResponseWriter, r *http.Request) {
@@ -160,7 +170,6 @@ func createUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// TODO: add regenerate OTP for 3 times also and then cookie encryption
 func verifyUserHandler(w http.ResponseWriter, r *http.Request) {
 	var errs []error
 	var redisUser RedisUser
@@ -269,6 +278,7 @@ func resendOtpHandler(w http.ResponseWriter, r *http.Request) {
 
 		_, err = tx.Exec(ctx)
 		if err != nil {
+			errs = append(errs, errors.New("something went wrong try again"))
 			return
 		}
 
