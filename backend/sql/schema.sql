@@ -13,11 +13,12 @@ CREATE TABLE IF NOT EXISTS users (
 -- article category table
 CREATE TABLE IF NOT EXISTS categories (
     category_id UUID DEFAULT gen_random_uuid () PRIMARY KEY,
-    name VARCHAR(64) NOT NULL UNIQUE
+    category_name VARCHAR(64) NOT NULL UNIQUE
 );
 
 -- article table
 CREATE TABLE IF NOT EXISTS articles (
+    author_id UUID NOT NULL,
     author VARCHAR(64) NOT NULL,
     category_id UUID,
     title VARCHAR(256) NOT NULL UNIQUE,
@@ -30,11 +31,12 @@ CREATE TABLE IF NOT EXISTS articles (
 -- message or comment
 CREATE TABLE IF NOT EXISTS messages (
     author VARCHAR(64) NOT NULL,
+    author_id UUID NOT NULL,
     message_id UUID DEFAULT gen_random_uuid () PRIMARY KEY,
     reply_to UUID,
     content TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    in_table CHAR CHECK (in_table IN ('F', 'A', 'P')) NOT NULL,
+    message_in_table UUID NOT NULL,
     FOREIGN KEY (reply_to) REFERENCES messages (message_id) ON DELETE CASCADE
 );
 
@@ -45,7 +47,7 @@ CREATE TABLE IF NOT EXISTS forums (
     forum_image BYTEA NOT NULL,
     public BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by VARCHAR(64) NOT NULL
+    created_by UUID NOT NULL
 );
 
 -- forum_users | many to many
@@ -74,7 +76,7 @@ CREATE TABLE IF NOT EXISTS polls (
     poll_id UUID DEFAULT gen_random_uuid () PRIMARY KEY,
     poll_title VARCHAR(256) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by VARCHAR(64) NOT NULL
+    created_by UUID NOT NULL
 );
 
 -- poll options
@@ -91,21 +93,21 @@ CREATE TABLE IF NOT EXISTS poll_votes (
     poll_id UUID REFERENCES polls (poll_id) ON DELETE CASCADE,
     option_id UUID REFERENCES poll_options (option_id) ON DELETE CASCADE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    voter VARCHAR(64) NOT NULL,
+    voter UUID NOT NULL,
     UNIQUE (poll_id, voter)
 );
 
 CREATE INDEX IF NOT EXISTS idx_username ON users (username);
 
-CREATE INDEX IF NOT EXISTS idx_name ON categories (name);
+CREATE INDEX IF NOT EXISTS idx_name ON categories (category_name);
 
 CREATE INDEX IF NOT EXISTS idx_title ON articles (title);
 
-CREATE INDEX IF NOT EXISTS idx_author_article ON articles (author);
+CREATE INDEX IF NOT EXISTS idx_author_id_article ON articles (author_id);
 
-CREATE INDEX IF NOT EXISTS idx_in_table ON messages (in_table);
+CREATE INDEX IF NOT EXISTS idx_author_id_messages ON messages (author_id);
 
-CREATE INDEX IF NOT EXISTS idx_author_messages ON messages (author);
+CREATE INDEX IF NOT EXISTS idx_message_in_table ON messages (message_in_table);
 
 CREATE INDEX IF NOT EXISTS idx_forum_name ON forums (forum_name);
 
