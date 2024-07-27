@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>WebSocket Client</title>
+  </head>
+  <body>
+    <h1>WebSocket Client</h1>
+    <div id="messages" style="height: 300px; overflow-y: scroll"></div>
+    <button id="sendMessage">Send Message</button>
+    <input type="text" id="messageInput" placeholder="Enter your message" />
+
+    <script>
+      // Create WebSocket connection
+      const socket = new WebSocket("ws://localhost:3000/subscribe");
+
+      // Connection opened
+      socket.addEventListener("open", function (event) {
+        console.log("Connected to WebSocket server");
+      });
+
+      // Listen for messages
+      socket.addEventListener("message", function (event) {
+        console.log("Message from server ", event.data);
+        const messagesDiv = document.getElementById("messages");
+        const newMessage = document.createElement("h1");
+        const messageData = event.data;
+        const match = messageData.match(/Message ID: (\d+), Content: (.+)/);
+        if (match) {
+          const messageId = match[1];
+          const messageContent = match[2];
+
+          // Set the h1 content and id
+          newMessage.textContent = messageContent;
+          newMessage.id = `Message ID:${messageId}`;
+        } else {
+          newMessage.textContent = event.data;
+        }
+
+        messagesDiv.appendChild(newMessage);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      });
+
+      document
+        .getElementById("messages")
+        .addEventListener("scroll", function () {
+          if (this.scrollTop === 0) {
+            console.log("Scrolled to the top!");
+            const messagesDivID =
+              document.getElementById("messages").firstElementChild.id;
+            console.log(messagesDivID);
+            socket.send(messagesDivID);
+          }
+        });
+      // Send a message
+      document
+        .getElementById("sendMessage")
+        .addEventListener("click", function () {
+          const messageInput = document.getElementById("messageInput");
+          const message = messageInput.value;
+          socket.send(message);
+          messageInput.value = "";
+        });
+    </script>
+  </body>
+</html>

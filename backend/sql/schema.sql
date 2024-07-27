@@ -36,7 +36,8 @@ CREATE TABLE IF NOT EXISTS messages (
     reply_to UUID,
     content TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    message_in_table UUID NOT NULL,
+    in_table CHAR CHECK (in_table IN ('F', 'A', 'P')) NOT NULL,
+    in_table_id UUID NOT NULL,
     FOREIGN KEY (reply_to) REFERENCES messages (message_id) ON DELETE CASCADE
 );
 
@@ -97,25 +98,27 @@ CREATE TABLE IF NOT EXISTS poll_votes (
     UNIQUE (poll_id, voter)
 );
 
-CREATE INDEX IF NOT EXISTS idx_username ON users (username);
+CREATE INDEX IF NOT EXISTS idx_username_users ON users (username);
 
-CREATE INDEX IF NOT EXISTS idx_name ON categories (category_name);
+CREATE INDEX IF NOT EXISTS idx_name_categories ON categories (category_name);
 
-CREATE INDEX IF NOT EXISTS idx_title ON articles (title);
+CREATE INDEX IF NOT EXISTS idx_title_articles ON articles (title);
 
-CREATE INDEX IF NOT EXISTS idx_author_id_article ON articles (author_id);
+CREATE INDEX IF NOT EXISTS idx_author_id_articles ON articles (author_id);
 
 CREATE INDEX IF NOT EXISTS idx_author_id_messages ON messages (author_id);
 
-CREATE INDEX IF NOT EXISTS idx_message_in_table ON messages (message_in_table);
+CREATE INDEX IF NOT EXISTS idx_in_table_meesages ON messages (in_table);
 
-CREATE INDEX IF NOT EXISTS idx_forum_name ON forums (forum_name);
+CREATE INDEX IF NOT EXISTS idx_in_table_id_messages ON messages (in_table_id);
 
-CREATE INDEX IF NOT EXISTS idx_forum_id_users ON forum_users (forum_id);
+CREATE INDEX IF NOT EXISTS idx_forum_name_forums ON forums (forum_name);
 
-CREATE INDEX IF NOT EXISTS idx_forum_id_admins ON forum_admins (forum_id);
+CREATE INDEX IF NOT EXISTS idx_forum_id_users_forums ON forum_users (forum_id);
 
-CREATE INDEX IF NOT EXISTS idx_forum_id_mods ON forum_mods (forum_id);
+CREATE INDEX IF NOT EXISTS idx_forum_id_admins_forums ON forum_admins (forum_id);
+
+CREATE INDEX IF NOT EXISTS idx_forum_id_mods_forums ON forum_mods (forum_id);
 
 CREATE INDEX IF NOT EXISTS idx_poll_id_polls ON polls (poll_id);
 

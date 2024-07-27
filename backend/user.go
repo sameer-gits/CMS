@@ -244,10 +244,9 @@ func userInfoMiddleware(r *http.Request) (DbUser, error) {
 	_, err = tx.Exec(ctx)
 	if err != nil {
 		database.RedisAllClients.Client1.Del(ctx, userID.String())
-		log.Println(2)
+		log.Println("err creating temp user: %w", err)
 		return DbUser{}, err
 	}
 	user.UserID = uuid.Nil
-	log.Println(3)
 	return user, nil
 }

@@ -17,23 +17,26 @@ import (
 )
 
 const (
-	serverCode   = http.StatusInternalServerError
-	unauthorized = http.StatusUnauthorized
-	statusOK     = http.StatusOK
-	badCode      = http.StatusBadRequest
+	serverCode       = http.StatusInternalServerError
+	unauthorized     = http.StatusUnauthorized
+	statusOK         = http.StatusOK
+	statusAccepted   = http.StatusAccepted
+	badCode          = http.StatusBadRequest
+	methodNotAllowed = http.StatusMethodNotAllowed
 )
 
 func routes() {
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8000"
+		port = "3000"
 	}
 	mux := http.NewServeMux()
+	srv := newServer()
 
 	mux.HandleFunc("/", homeHandler)
 	mux.HandleFunc("/login", loginHandler)
 	mux.HandleFunc("/logout", deleteCookieHandler)
-	mux.HandleFunc("/protected", protectedHandler)
+	mux.HandleFunc("/user", userHandler)
 	mux.HandleFunc("/404", notFoundHandler)
 	mux.HandleFunc("/verify", redirectLoginHandler)
 	mux.HandleFunc("/resendotp", redirectLoginHandler)
@@ -41,6 +44,10 @@ func routes() {
 	mux.HandleFunc("POST /login", createUserHandler)
 	mux.HandleFunc("POST /verify", verifyUserHandler)
 	mux.HandleFunc("POST /resendotp", resendOtpHandler)
+
+	//	websocket
+	mux.HandleFunc("/subscribe/{room_type}/{room_id}", srv.subscribeHandler)
+	mux.HandleFunc("POST /publish/{room_type}/{room_id}", srv.publishHandler)
 
 	localFlies := http.FileServer(http.Dir("../frontend/public"))
 	mux.Handle("/public/", http.StripPrefix("/public/", localFlies))
@@ -56,17 +63,17 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	renderHtml(w, formUser, nil, "login.html")
 }
 
-func protectedHandler(w http.ResponseWriter, r *http.Request) {
+func userHandler(w http.ResponseWriter, r *http.Request) {
 	user, err := userInfoMiddleware(r)
 	if err != nil {
-		http.Redirect(w, r, "/logout", http.StatusFound)
+		http.Redirect(w, r, "/logout", badCode)
 		return
 	}
-	renderHtml(w, user, nil, "protected.html")
+	renderHtml(w, user, nil, "user.html")
 }
 
 func redirectLoginHandler(w http.ResponseWriter, r *http.Request) {
-	http.Redirect(w, r, "/login", http.StatusFound)
+	http.Redirect(w, r, "/login", badCode)
 }
 
 func notFoundHandler(w http.ResponseWriter, r *http.Request) {
