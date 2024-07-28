@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -13,6 +14,11 @@ import (
 	"golang.org/x/time/rate"
 	"nhooyr.io/websocket"
 )
+
+type roomKey struct {
+	roomID   string
+	roomType string
+}
 
 type webstocketServer struct {
 	roomsMu sync.RWMutex
@@ -40,11 +46,12 @@ func newServer() *webstocketServer {
 	}
 }
 
-func (s *webstocketServer) getRoom(name string) *chatRoom {
+func (s *webstocketServer) getRoom(roomKey roomKey) *chatRoom {
 	s.roomsMu.Lock()
+	key := fmt.Sprintf("%s_%s", roomKey.roomType, roomKey.roomID)
 	defer s.roomsMu.Unlock()
 
-	room, ok := s.rooms[name]
+	room, ok := s.rooms[key]
 	if !ok {
 		room = &chatRoom{
 			subscriberMessageBuffer: 16,
@@ -52,41 +59,39 @@ func (s *webstocketServer) getRoom(name string) *chatRoom {
 			subscribers:             make(map[*subscriber]struct{}),
 			publishLimiter:          rate.NewLimiter(rate.Every(time.Millisecond*100), 8),
 		}
-		s.rooms[name] = room
+		s.rooms[key] = room
 	}
 
 	return room
 }
 
 func (s *webstocketServer) publishHandler(w http.ResponseWriter, r *http.Request) {
-	roomName := r.PathValue("room_id")
-	roomType := r.PathValue("room_type")
+	roomKey := roomKey{
+		roomID:   r.PathValue("room_id"),
+		roomType: r.PathValue("room_type"),
+	}
 
-	// TODO: check for room type so later it can be stored in correct database table and validate room id
-	log.Println(roomType)
-
-	if roomName == "" {
-		http.Error(w, "room name is required", badCode)
+	if roomKey.roomType == "" || roomKey.roomID == "" {
+		http.Error(w, "room is required", badCode)
 		return
 	}
 
-	cr := s.getRoom(roomName)
+	cr := s.getRoom(roomKey)
 	cr.publishHandler(w, r)
 }
 
 func (s *webstocketServer) subscribeHandler(w http.ResponseWriter, r *http.Request) {
-	roomName := r.PathValue("room_id")
-	roomType := r.PathValue("room_type")
+	roomKey := roomKey{
+		roomID:   r.PathValue("room_id"),
+		roomType: r.PathValue("room_type"),
+	}
 
-	// TODO: check for room type so later it can be stored in correct database table and validate room id
-	log.Println(roomType)
-
-	if roomName == "" {
-		http.Error(w, "room name is required", badCode)
+	if roomKey.roomType == "" || roomKey.roomID == "" {
+		http.Error(w, "room is required", badCode)
 		return
 	}
 
-	cr := s.getRoom(roomName)
+	cr := s.getRoom(roomKey)
 	err := cr.subscribe(r.Context(), w, r)
 	if errors.Is(err, context.Canceled) {
 		return

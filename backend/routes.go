@@ -23,6 +23,7 @@ const (
 	statusAccepted   = http.StatusAccepted
 	badCode          = http.StatusBadRequest
 	methodNotAllowed = http.StatusMethodNotAllowed
+	forbidden        = http.StatusForbidden
 )
 
 func routes() {
@@ -45,7 +46,7 @@ func routes() {
 	mux.HandleFunc("POST /verify", verifyUserHandler)
 	mux.HandleFunc("POST /resendotp", resendOtpHandler)
 
-	//	websocket
+	// websocket
 	mux.HandleFunc("/subscribe/{room_type}/{room_id}", srv.subscribeHandler)
 	mux.HandleFunc("POST /publish/{room_type}/{room_id}", srv.publishHandler)
 
