@@ -18,9 +18,10 @@ import (
 
 type DbUser struct {
 	UserID       uuid.UUID `form:"user_id" json:"user_id" redis:"user_id"`
+	Identifier   uuid.UUID `form:"identifier" json:"identifier" redis:"identifier"`
 	Username     string    `form:"username" json:"username" redis:"username"`
 	Fullname     string    `form:"fullname" json:"fullname" redis:"fullname"`
-	Role         string    `form:"role" json:"role" redis:"role"`
+	Role         rune      `form:"role" json:"role" redis:"role"`
 	JoinedAt     time.Time `form:"joined_at" json:"joined_at" redis:"joined_at"`
 	Email        string    `form:"email" json:"email" redis:"email"`
 	Password     string    `form:"password" json:"password" redis:"password"`
@@ -211,11 +212,12 @@ func userInfoMiddleware(r *http.Request) (DbUser, error) {
 
 	// Check if user exists in main DB
 	getUser := `
-	SELECT username, fullname, role, joined_at, email, profile_image
+	SELECT username, user_identifier, fullname, role, joined_at, email, profile_image
 	FROM users WHERE user_id = $1;
 	`
 	err = database.Dbpool.QueryRow(ctx, getUser, userID).Scan(
 		&user.Username,
+		&user.Identifier,
 		&user.Fullname,
 		&user.Role,
 		&user.JoinedAt,

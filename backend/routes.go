@@ -45,6 +45,7 @@ func routes() {
 	mux.HandleFunc("POST /login", createUserHandler)
 	mux.HandleFunc("POST /verify", verifyUserHandler)
 	mux.HandleFunc("POST /resendotp", resendOtpHandler)
+	mux.HandleFunc("POST /sendmessage", insertMessageHandler)
 
 	// websocket
 	mux.HandleFunc("/subscribe/{room_type}/{room_id}", srv.subscribeHandler)

@@ -23,13 +23,17 @@ DROP TABLE IF EXISTS users;
 -- index
 DROP INDEX IF EXISTS idx_username_users;
 
+DROP INDEX IF EXISTS idx_user_identifier_users;
+
 DROP INDEX IF EXISTS idx_name_categories;
 
 DROP INDEX IF EXISTS idx_title_articles;
 
-DROP INDEX IF EXISTS idx_author_id_articles;
+DROP INDEX IF EXISTS idx_author_identifier_articles;
 
-DROP INDEX IF EXISTS idx_author_id_messages;
+DROP INDEX IF EXISTS idx_author_identifier_messages;
+
+DROP INDEX IF EXISTS idx_reply_to_identifier_messages;
 
 DROP INDEX IF EXISTS idx_in_table_meesages;
 
