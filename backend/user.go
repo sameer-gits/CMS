@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"regexp"
@@ -12,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/lib/pq"
 	"github.com/redis/go-redis/v9"
 	"github.com/sameer-gits/CMS/database"
 )
@@ -50,6 +53,7 @@ type RedisUser struct {
 func validateForm(r *http.Request) (FormUser, []error) {
 	var errs []error
 	var dbexists bool
+	ctx := context.Background()
 
 	form := FormUser{
 		Username:        r.FormValue("username"),
@@ -63,14 +67,13 @@ func validateForm(r *http.Request) (FormUser, []error) {
 	checkFormData := `
 	SELECT EXISTS (SELECT 1 FROM users WHERE username = $1 OR email = $2);
 	`
-	err := database.Dbpool.QueryRow(context.Background(), checkFormData,
+	err := database.Dbpool.QueryRow(ctx, checkFormData,
 		form.Username, form.Email).Scan(&dbexists)
 	if err != nil {
 		errs = append(errs, errors.New("error checking database for username or email"))
 	} else if dbexists {
 		errs = append(errs, errors.New("username or email already exists in db"))
 	}
-	ctx := context.Background()
 
 	// check in redis if username or email already exists
 	var redisexists string
@@ -251,4 +254,37 @@ func userInfoMiddleware(r *http.Request) (DbUser, error) {
 	}
 	user.UserID = uuid.Nil
 	return user, nil
+}
+
+func getUserIdentifier(ctx context.Context, userIdentifier uuid.UUID) (bool, error) {
+	var uIdentifier uuid.UUID
+	getUser := `
+	SELECT user_identifier
+	FROM users WHERE user_identifier = $1;
+	`
+	err := database.Dbpool.QueryRow(ctx, getUser, userIdentifier).Scan(&uIdentifier)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+func getInTableID(ctx context.Context, inTableID uuid.UUID, tableName string) (bool, error) {
+	var tableID uuid.UUID
+	getUser := fmt.Sprintf(`
+	SELECT user_identifier
+	FROM %s WHERE user_identifier = $1;
+	`, pq.QuoteIdentifier(tableName))
+
+	err := database.Dbpool.QueryRow(ctx, getUser, inTableID).Scan(&tableID)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
