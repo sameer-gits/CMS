@@ -1,200 +1,146 @@
 package main
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
 	"sync"
-	"time"
 
-	"golang.org/x/time/rate"
-	"nhooyr.io/websocket"
+	"github.com/gobwas/ws"
+	"github.com/gobwas/ws/wsutil"
+	"github.com/google/uuid"
 )
 
-type roomKey struct {
-	roomID   string
-	roomType string
+type RoomKey struct {
+	ID       uuid.UUID
+	RoomType string
 }
 
-type webstocketServer struct {
-	roomsMu sync.RWMutex
-	rooms   map[string]*chatRoom
-	logf    func(f string, v ...interface{})
+type Subscriber struct {
+	Conn net.Conn
+	Room *Room
 }
 
-type chatRoom struct {
-	subscriberMessageBuffer int
-	publishLimiter          *rate.Limiter
-	logf                    func(f string, v ...interface{})
-	subscribersMu           sync.RWMutex
-	subscribers             map[*subscriber]struct{}
+type Room struct {
+	Subscribers map[*Subscriber]bool
+	Mu          sync.RWMutex
 }
 
-type subscriber struct {
-	msgs      chan []byte
-	closeSlow func()
+type WebsocketServer struct {
+	Rooms map[RoomKey]*Room
+	Mu    sync.RWMutex
 }
 
-func newServer() *webstocketServer {
-	return &webstocketServer{
-		rooms: make(map[string]*chatRoom),
-		logf:  log.Printf,
+func newWebsocketServer() *WebsocketServer {
+	return &WebsocketServer{
+		Rooms: make(map[RoomKey]*Room),
 	}
 }
 
-func (s *webstocketServer) getRoom(roomKey roomKey) *chatRoom {
-	s.roomsMu.Lock()
-	key := fmt.Sprintf("%s_%s", roomKey.roomType, roomKey.roomID)
-	defer s.roomsMu.Unlock()
+func (s *WebsocketServer) websocketServerHandler(w http.ResponseWriter, r *http.Request) {
+	var errs []error
 
-	room, ok := s.rooms[key]
-	if !ok {
-		room = &chatRoom{
-			subscriberMessageBuffer: 16,
-			logf:                    s.logf,
-			subscribers:             make(map[*subscriber]struct{}),
-			publishLimiter:          rate.NewLimiter(rate.Every(time.Millisecond*100), 8),
+	defer func() {
+		if len(errs) > 0 {
+			w.WriteHeader(badCode)
+			renderHtml(w, nil, errs, "user.html")
+		} else if len(errs) == 0 {
+			renderHtml(w, nil, errs, "user.html")
 		}
-		s.rooms[key] = room
-	}
+	}()
 
-	return room
-}
-
-func (s *webstocketServer) publishHandler(w http.ResponseWriter, r *http.Request) {
-	roomKey := roomKey{
-		roomID:   r.PathValue("room_id"),
-		roomType: r.PathValue("room_type"),
-	}
-
-	if roomKey.roomType == "" || roomKey.roomID == "" {
-		http.Error(w, "room is required", badCode)
-		return
-	}
-
-	cr := s.getRoom(roomKey)
-	cr.publishHandler(w, r)
-}
-
-func (s *webstocketServer) subscribeHandler(w http.ResponseWriter, r *http.Request) {
-	roomKey := roomKey{
-		roomID:   r.PathValue("room_id"),
-		roomType: r.PathValue("room_type"),
-	}
-
-	if roomKey.roomType == "" || roomKey.roomID == "" {
-		http.Error(w, "room is required", badCode)
-		return
-	}
-
-	cr := s.getRoom(roomKey)
-	err := cr.subscribe(r.Context(), w, r)
-	if errors.Is(err, context.Canceled) {
-		return
-	}
-	if websocket.CloseStatus(err) == websocket.StatusNormalClosure ||
-		websocket.CloseStatus(err) == websocket.StatusGoingAway {
-		return
-	}
+	roomID, err := uuid.Parse(r.PathValue("id"))
 	if err != nil {
-		s.logf("subscribe error: %v", err)
+		errs = append(errs, fmt.Errorf("error uuid: %w", err))
 		return
 	}
-}
 
-func (cr *chatRoom) publishHandler(w http.ResponseWriter, r *http.Request) {
-	body := http.MaxBytesReader(w, r.Body, 8192)
-	msg, err := io.ReadAll(body)
+	conn, _, _, err := ws.UpgradeHTTP(r, w)
 	if err != nil {
-		http.Error(w, "request too large", http.StatusRequestEntityTooLarge)
+		errs = append(errs, fmt.Errorf("error upgrading conn: %w", err))
 		return
 	}
-
-	cr.publish(msg)
-
-	w.WriteHeader(statusAccepted)
+	roomKey := RoomKey{
+		ID:       roomID,
+		RoomType: r.PathValue("roomtype"),
+	}
+	err = s.subscribe(conn, roomKey)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("conn error: %w", err))
+		return
+	}
 }
 
-func (cr *chatRoom) publish(msg []byte) {
-	cr.subscribersMu.Lock()
-	defer cr.subscribersMu.Unlock()
+func (s *WebsocketServer) subscribe(conn net.Conn, roomKey RoomKey) error {
+	s.Mu.Lock()
 
-	cr.publishLimiter.Wait(context.Background())
-
-	for s := range cr.subscribers {
-		select {
-		case s.msgs <- msg:
-		default:
-			go s.closeSlow()
+	room, exists := s.Rooms[roomKey]
+	if !exists {
+		room = &Room{
+			Subscribers: make(map[*Subscriber]bool),
 		}
+		s.Rooms[roomKey] = room
 	}
+
+	s.Mu.Unlock()
+	subscriber := &Subscriber{
+		Conn: conn,
+		Room: room,
+	}
+	room.Mu.Lock()
+	room.Subscribers[subscriber] = true
+	room.Mu.Unlock()
+
+	err := make(chan error)
+	go func() {
+		err <- s.listener(subscriber, roomKey)
+	}()
+
+	log.Printf("subscriber: %v, broadcast err: %v\n", subscriber, err)
+	return nil
 }
 
-func (cr *chatRoom) subscribe(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
-	var mu sync.Mutex
-	var c *websocket.Conn
-	var closed bool
-	s := &subscriber{
-		msgs: make(chan []byte, cr.subscriberMessageBuffer),
-		closeSlow: func() {
-			mu.Lock()
-			defer mu.Unlock()
-			closed = true
-			if c != nil {
-				c.Close(websocket.StatusPolicyViolation, "connection too slow to keep up with messages")
-			}
-		},
-	}
-	cr.addSubscriber(s)
-	defer cr.deleteSubscriber(s)
-
-	c2, err := websocket.Accept(w, r, nil)
-	if err != nil {
-		return err
-	}
-	mu.Lock()
-	if closed {
-		mu.Unlock()
-		return net.ErrClosed
-	}
-	c = c2
-	mu.Unlock()
-	defer c.CloseNow()
-
-	ctx = c.CloseRead(ctx)
-
+func (s *WebsocketServer) listener(subscriber *Subscriber, roomKey RoomKey) error {
+	defer s.unSubscribe(subscriber)
 	for {
-		select {
-		case msg := <-s.msgs:
-			err := writeTimeout(ctx, time.Second*5, c, msg)
-			if err != nil {
-				return err
+		msg, op, err := wsutil.ReadClientData(subscriber.Conn)
+		if err != nil {
+			if err != io.EOF {
+				return fmt.Errorf("listen conn error: %w", err)
 			}
-		case <-ctx.Done():
-			return ctx.Err()
 		}
+		if op == ws.OpClose {
+			return nil
+		}
+		s.broadcast(msg, roomKey)
 	}
 }
 
-func (cr *chatRoom) addSubscriber(s *subscriber) {
-	cr.subscribersMu.Lock()
-	cr.subscribers[s] = struct{}{}
-	cr.subscribersMu.Unlock()
+func (s *WebsocketServer) broadcast(message []byte, roomKey RoomKey) error {
+	s.Mu.RLock()
+	room, exists := s.Rooms[roomKey]
+	s.Mu.RUnlock()
+
+	if !exists {
+		return fmt.Errorf("room not found")
+	}
+
+	room.Mu.RLock()
+	defer room.Mu.RUnlock()
+	for subscriber := range room.Subscribers {
+		err := wsutil.WriteServerMessage(subscriber.Conn, ws.OpText, message)
+		if err != nil {
+			log.Printf("subscriber: %v, broadcast err: %v\n", subscriber, err)
+			s.unSubscribe(subscriber)
+		}
+	}
+	return nil
 }
-
-func (cr *chatRoom) deleteSubscriber(s *subscriber) {
-	cr.subscribersMu.Lock()
-	delete(cr.subscribers, s)
-	cr.subscribersMu.Unlock()
-}
-
-func writeTimeout(ctx context.Context, timeout time.Duration, c *websocket.Conn, msg []byte) error {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	return c.Write(ctx, websocket.MessageText, msg)
+func (s *WebsocketServer) unSubscribe(subscriber *Subscriber) {
+	subscriber.Room.Mu.Lock()
+	delete(subscriber.Room.Subscribers, subscriber)
+	subscriber.Room.Mu.Unlock()
+	subscriber.Conn.Close()
 }

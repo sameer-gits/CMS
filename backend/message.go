@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
@@ -10,7 +11,7 @@ import (
 	"github.com/sameer-gits/CMS/database"
 )
 
-type message struct {
+type Message struct {
 	AuthorUsername    string
 	AuthorIdentifier  uuid.UUID
 	MessageId         uuid.UUID
@@ -23,7 +24,7 @@ type message struct {
 
 func insertMessageHandler(w http.ResponseWriter, r *http.Request) {
 	var errs []error
-	var msg message
+	var msg Message
 	var inTableRune rune
 	var replyToIdentifierUUID uuid.UUID
 
@@ -37,9 +38,9 @@ func insertMessageHandler(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if len(errs) > 0 {
 			w.WriteHeader(badCode)
-			renderHtml(w, msg, errs, ".html")
+			renderHtml(w, msg, errs, "user.html")
 		} else if len(errs) == 0 {
-			renderHtml(w, nil, errs, ".html")
+			renderHtml(w, msg, errs, "user.html")
 		}
 	}()
 
@@ -82,14 +83,14 @@ func insertMessageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var tableName string
+	var tableType string
 	switch inTableRune {
 	case 'F':
-		tableName = "forums"
+		tableType = "forums"
 	case 'A':
-		tableName = "articles"
+		tableType = "articles"
 	case 'P':
-		tableName = "polls"
+		tableType = "polls"
 	default:
 		errs = append(errs, errors.New("something went wrong table type does not exists"))
 		return
@@ -101,7 +102,7 @@ func insertMessageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	exists, err := getInTableID(ctx, inTableID, tableName)
+	exists, err := getInTableID(ctx, inTableID, tableType)
 	if err != nil {
 		errs = append(errs, errors.New("something went wrong in server try again"))
 		return
@@ -112,7 +113,7 @@ func insertMessageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	msg = message{
+	msg = Message{
 		AuthorUsername:    user.Username,
 		AuthorIdentifier:  user.Identifier,
 		ReplyToIdentifier: replyToIdentifierUUID,
@@ -123,11 +124,20 @@ func insertMessageHandler(w http.ResponseWriter, r *http.Request) {
 
 	msg.insertMessage(ctx)
 
+	msgByte, err := json.Marshal(msg)
+	if err != nil {
+		errs = append(errs, errors.New("something went wrong try refreshing"))
+		return
+	}
+
+	roomKey := RoomKey{ID: inTableID, RoomType: tableType}
+
 	// add websocket here or if needed add redis for cache
+	wsSrv.broadcast(msgByte, roomKey)
 }
 
-func (msg message) insertMessage(ctx context.Context) (message, error) {
-	var result message
+func (msg Message) insertMessage(ctx context.Context) (Message, error) {
+	var result Message
 	var insertMsg string
 
 	if msg.ReplyToIdentifier == uuid.Nil {
@@ -137,7 +147,7 @@ func (msg message) insertMessage(ctx context.Context) (message, error) {
 		err := database.Dbpool.QueryRow(ctx, insertMsg, msg.AuthorUsername, msg.AuthorIdentifier, msg.Content, msg.InTable, msg.InTableID).Scan(
 			&result.MessageId, &result.AuthorUsername, &result.AuthorIdentifier, &result.Content, &result.CreatedAt, &result.InTable, &result.InTableID)
 		if err != nil {
-			return message{}, err
+			return Message{}, err
 		}
 	} else {
 		insertMsg = `INSERT INTO messages (author, author_id, reply_to, content, in_table, in_table_id)
@@ -146,7 +156,7 @@ func (msg message) insertMessage(ctx context.Context) (message, error) {
 		err := database.Dbpool.QueryRow(ctx, insertMsg, msg.AuthorUsername, msg.AuthorIdentifier, msg.ReplyToIdentifier, msg.Content, msg.InTable, msg.InTableID).Scan(
 			&result.MessageId, &result.AuthorUsername, &result.AuthorIdentifier, &result.ReplyToIdentifier, &result.Content, &result.CreatedAt, &result.InTable, &result.InTableID)
 		if err != nil {
-			return message{}, err
+			return Message{}, err
 		}
 	}
 

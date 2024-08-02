@@ -2,7 +2,7 @@ package main
 
 import "net/smtp"
 
-type mailTo struct {
+type MailTo struct {
 	from        string
 	password    string
 	sendTo      []string
@@ -11,7 +11,7 @@ type mailTo struct {
 	mailMessage string
 }
 
-func (m mailTo) sendMail() error {
+func (m MailTo) sendMail() error {
 	messageByte := []byte(m.mailMessage)
 	mailAuth := smtp.PlainAuth("", m.from, m.password, m.smtpHost)
 

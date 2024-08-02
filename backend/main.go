@@ -8,10 +8,6 @@ import (
 	"github.com/sameer-gits/CMS/database"
 )
 
-type ErrorResponse struct {
-	Errors []string `json:"errors"`
-}
-
 func init() {
 	err := godotenv.Load("../.env")
 	if err != nil {

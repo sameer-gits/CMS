@@ -15,7 +15,7 @@ import (
 )
 
 type Cookie struct {
-	UserID uuid.UUID
+	userID uuid.UUID
 }
 
 var cookieName = "cookie"
@@ -70,7 +70,7 @@ func (c Cookie) encryptCookie() (string, error) {
 		return "", errors.New("failed to create nonce")
 	}
 
-	encryptedData := gcm.Seal(nonce, nonce, []byte(c.UserID.String()), nil)
+	encryptedData := gcm.Seal(nonce, nonce, []byte(c.userID.String()), nil)
 	return base64.URLEncoding.EncodeToString(encryptedData), nil
 }
 

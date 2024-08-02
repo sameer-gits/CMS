@@ -26,13 +26,17 @@ const (
 	forbidden        = http.StatusForbidden
 )
 
+var wsSrv *WebsocketServer
+
 func routes() {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000"
 	}
 	mux := http.NewServeMux()
-	srv := newServer()
+	srv := newWebsocketServer()
+
+	wsSrv = srv
 
 	mux.HandleFunc("/", homeHandler)
 	mux.HandleFunc("/login", loginHandler)
@@ -46,10 +50,7 @@ func routes() {
 	mux.HandleFunc("POST /verify", verifyUserHandler)
 	mux.HandleFunc("POST /resendotp", resendOtpHandler)
 	mux.HandleFunc("POST /sendmessage", insertMessageHandler)
-
-	// websocket
-	mux.HandleFunc("/subscribe/{room_type}/{room_id}", srv.subscribeHandler)
-	mux.HandleFunc("POST /publish/{room_type}/{room_id}", srv.publishHandler)
+	mux.HandleFunc("/{type}/{id}", srv.websocketServerHandler)
 
 	localFlies := http.FileServer(http.Dir("../frontend/public"))
 	mux.Handle("/public/", http.StripPrefix("/public/", localFlies))
@@ -164,7 +165,7 @@ func createUserHandler(w http.ResponseWriter, r *http.Request) {
 	message := headers + body
 
 	// send OTP to user here
-	sendMailTo := mailTo{
+	sendMailTo := MailTo{
 		from:        os.Getenv("EMAIL_SMTP"),
 		password:    os.Getenv("EMAIL_SMTP_PASSWORD"),
 		sendTo:      []string{redisUser.Email},
@@ -246,7 +247,7 @@ func verifyUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	c := Cookie{
-		UserID: userID,
+		userID: userID,
 	}
 
 	c.createCookie(w)
@@ -324,7 +325,7 @@ func resendOtpHandler(w http.ResponseWriter, r *http.Request) {
 	message := headers + body
 
 	// send OTP to user here
-	sendMailTo := mailTo{
+	sendMailTo := MailTo{
 		from:        os.Getenv("EMAIL_SMTP"),
 		password:    os.Getenv("EMAIL_SMTP_PASSWORD"),
 		sendTo:      []string{redisUser.Email},
