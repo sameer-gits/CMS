@@ -45,10 +45,10 @@ CREATE TABLE IF NOT EXISTS messages (
 CREATE TABLE IF NOT EXISTS forums (
     forum_id UUID DEFAULT gen_random_uuid () PRIMARY KEY,
     forum_name VARCHAR(128) NOT NULL UNIQUE,
-    forum_image BYTEA NOT NULL,
+    forum_image BYTEA,
     public BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    created_by UUID NOT NULL
+    created_by_identifier UUID NOT NULL
 );
 
 -- forum_users | many to many

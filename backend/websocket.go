@@ -1,146 +1,108 @@
 package main
 
 import (
-	"fmt"
-	"io"
 	"log"
-	"net"
 	"net/http"
 	"sync"
 
-	"github.com/gobwas/ws"
-	"github.com/gobwas/ws/wsutil"
 	"github.com/google/uuid"
+	"github.com/lesismal/nbio/nbhttp/websocket"
 )
 
+type Room struct {
+	subscribers map[*Subscriber]bool
+	mu          sync.RWMutex
+}
+
 type RoomKey struct {
-	ID       uuid.UUID
-	RoomType string
+	id       uuid.UUID
+	roomtype string
 }
 
 type Subscriber struct {
-	Conn net.Conn
-	Room *Room
+	conn    *websocket.Conn
+	roomKey RoomKey
 }
 
-type Room struct {
-	Subscribers map[*Subscriber]bool
-	Mu          sync.RWMutex
+type RoomManager struct {
+	rooms map[RoomKey]*Room
+	mu    sync.RWMutex
 }
 
-type WebsocketServer struct {
-	Rooms map[RoomKey]*Room
-	Mu    sync.RWMutex
-}
-
-func newWebsocketServer() *WebsocketServer {
-	return &WebsocketServer{
-		Rooms: make(map[RoomKey]*Room),
+func NewRoomManager() *RoomManager {
+	return &RoomManager{
+		rooms: make(map[RoomKey]*Room),
 	}
 }
 
-func (s *WebsocketServer) websocketServerHandler(w http.ResponseWriter, r *http.Request) {
-	var errs []error
-
-	defer func() {
-		if len(errs) > 0 {
-			w.WriteHeader(badCode)
-			renderHtml(w, nil, errs, "user.html")
-		} else if len(errs) == 0 {
-			renderHtml(w, nil, errs, "user.html")
-		}
-	}()
-
-	roomID, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		errs = append(errs, fmt.Errorf("error uuid: %w", err))
+func (rm *RoomManager) publishHandler(key RoomKey, data []byte) {
+	rm.mu.RLock()
+	room, exists := rm.rooms[key]
+	rm.mu.RUnlock()
+	if !exists {
 		return
 	}
 
-	conn, _, _, err := ws.UpgradeHTTP(r, w)
-	if err != nil {
-		errs = append(errs, fmt.Errorf("error upgrading conn: %w", err))
-		return
-	}
-	roomKey := RoomKey{
-		ID:       roomID,
-		RoomType: r.PathValue("roomtype"),
-	}
-	err = s.subscribe(conn, roomKey)
-	if err != nil {
-		errs = append(errs, fmt.Errorf("conn error: %w", err))
-		return
+	room.mu.RLock()
+	defer room.mu.RUnlock()
+	for s := range room.subscribers {
+		go func(s *Subscriber) {
+			err := s.conn.WriteMessage(websocket.BinaryMessage, data)
+			if err != nil {
+				log.Println(s, err)
+			}
+		}(s)
 	}
 }
 
-func (s *WebsocketServer) subscribe(conn net.Conn, roomKey RoomKey) error {
-	s.Mu.Lock()
+func (rm *RoomManager) subscribeHandler(w http.ResponseWriter, r *http.Request) {
+	Id, err := uuid.Parse(r.PathValue("id"))
+	rmType := r.PathValue("type")
+	if err != nil || rmType == "" {
+		http.Redirect(w, r, "/404", notFound)
+		return
+	}
 
-	room, exists := s.Rooms[roomKey]
+	u := websocket.NewUpgrader()
+	conn, err := u.Upgrade(w, r, nil)
+	if err != nil {
+		return
+	}
+
+	key := RoomKey{
+		id:       Id,
+		roomtype: rmType,
+	}
+	rm.subscribe(key, conn)
+
+}
+
+func (rm *RoomManager) subscribe(key RoomKey, conn *websocket.Conn) {
+	rm.mu.Lock()
+	room, exists := rm.rooms[key]
 	if !exists {
 		room = &Room{
-			Subscribers: make(map[*Subscriber]bool),
+			subscribers: make(map[*Subscriber]bool),
 		}
-		s.Rooms[roomKey] = room
+		rm.rooms[key] = room
 	}
+	rm.mu.Unlock()
 
-	s.Mu.Unlock()
+	room.mu.Lock()
+	defer room.mu.Unlock()
 	subscriber := &Subscriber{
-		Conn: conn,
-		Room: room,
+		conn:    conn,
+		roomKey: key,
 	}
-	room.Mu.Lock()
-	room.Subscribers[subscriber] = true
-	room.Mu.Unlock()
+	room.subscribers[subscriber] = true
+	log.Println("room:", room)
 
-	err := make(chan error)
-	go func() {
-		err <- s.listener(subscriber, roomKey)
-	}()
-
-	log.Printf("subscriber: %v, broadcast err: %v\n", subscriber, err)
-	return nil
-}
-
-func (s *WebsocketServer) listener(subscriber *Subscriber, roomKey RoomKey) error {
-	defer s.unSubscribe(subscriber)
-	for {
-		msg, op, err := wsutil.ReadClientData(subscriber.Conn)
+	conn.OnClose(func(conn *websocket.Conn, err error) {
 		if err != nil {
-			if err != io.EOF {
-				return fmt.Errorf("listen conn error: %w", err)
-			}
+			log.Println("Connection closed with error:", err)
 		}
-		if op == ws.OpClose {
-			return nil
-		}
-		s.broadcast(msg, roomKey)
-	}
-}
-
-func (s *WebsocketServer) broadcast(message []byte, roomKey RoomKey) error {
-	s.Mu.RLock()
-	room, exists := s.Rooms[roomKey]
-	s.Mu.RUnlock()
-
-	if !exists {
-		return fmt.Errorf("room not found")
-	}
-
-	room.Mu.RLock()
-	defer room.Mu.RUnlock()
-	for subscriber := range room.Subscribers {
-		err := wsutil.WriteServerMessage(subscriber.Conn, ws.OpText, message)
-		if err != nil {
-			log.Printf("subscriber: %v, broadcast err: %v\n", subscriber, err)
-			s.unSubscribe(subscriber)
-		}
-	}
-	return nil
-}
-func (s *WebsocketServer) unSubscribe(subscriber *Subscriber) {
-	subscriber.Room.Mu.Lock()
-	delete(subscriber.Room.Subscribers, subscriber)
-	subscriber.Room.Mu.Unlock()
-	subscriber.Conn.Close()
+		room.mu.Lock()
+		defer room.mu.Unlock()
+		delete(room.subscribers, subscriber)
+	})
 }

@@ -1,7 +1,10 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>WebSocket Client</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>404 Not Found</title>
+    <link href="/public/styles/output.css" rel="stylesheet" />
   </head>
   <body>
     <h1>WebSocket Client</h1>
@@ -9,9 +12,24 @@
     <button id="sendMessage">Send Message</button>
     <input type="text" id="messageInput" placeholder="Enter your message" />
 
+    <h1>Create Forum</h1>
+    <form method="POST" enctype="multipart/form-data">
+      <div class="p-4">
+        <label for="forumName">Forum Name:</label>
+        <input type="text" id="forumName" name="forumName" />
+      </div>
+      <div class="p-4">
+        <label for="public">Public:</label>
+        <input type="checkbox" id="public" name="public" value="true" />
+      </div>
+      <div>
+        <button type="submit" formaction="/createforum">Create Forum</button>
+      </div>
+    </form>
+
     <script>
       // Create WebSocket connection
-      const socket = new WebSocket("ws://localhost:3000/subscribe");
+      const socket = new WebSocket("ws://localhost:3000/websocket/{type}/{id}");
 
       // Connection opened
       socket.addEventListener("open", function (event) {

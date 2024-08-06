@@ -23,20 +23,21 @@ const (
 	statusAccepted   = http.StatusAccepted
 	badCode          = http.StatusBadRequest
 	methodNotAllowed = http.StatusMethodNotAllowed
+	notFound         = http.StatusNotFound
 	forbidden        = http.StatusForbidden
 )
 
-var wsSrv *WebsocketServer
+var rmSrv *RoomManager
 
 func routes() {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3000"
 	}
-	mux := http.NewServeMux()
-	srv := newWebsocketServer()
 
-	wsSrv = srv
+	mux := http.NewServeMux()
+	rm := NewRoomManager()
+	rmSrv = rm
 
 	mux.HandleFunc("/", homeHandler)
 	mux.HandleFunc("/login", loginHandler)
@@ -45,12 +46,16 @@ func routes() {
 	mux.HandleFunc("/404", notFoundHandler)
 	mux.HandleFunc("/verify", redirectLoginHandler)
 	mux.HandleFunc("/resendotp", redirectLoginHandler)
+	mux.HandleFunc("/forums/{id}", viewForumHandler)
 
 	mux.HandleFunc("POST /login", createUserHandler)
 	mux.HandleFunc("POST /verify", verifyUserHandler)
 	mux.HandleFunc("POST /resendotp", resendOtpHandler)
 	mux.HandleFunc("POST /sendmessage", insertMessageHandler)
-	mux.HandleFunc("/{type}/{id}", srv.websocketServerHandler)
+	mux.HandleFunc("POST /createforum", createForumHandler)
+
+	// websocket subscribe
+	mux.HandleFunc("websocket/{type}/{id}", rm.subscribeHandler)
 
 	localFlies := http.FileServer(http.Dir("../frontend/public"))
 	mux.Handle("/public/", http.StripPrefix("/public/", localFlies))

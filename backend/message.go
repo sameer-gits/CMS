@@ -12,14 +12,14 @@ import (
 )
 
 type Message struct {
-	AuthorUsername    string
-	AuthorIdentifier  uuid.UUID
-	MessageId         uuid.UUID
-	ReplyToIdentifier uuid.UUID
-	Content           string
-	CreatedAt         time.Time
-	InTable           rune
-	InTableID         uuid.UUID
+	AuthorUsername    string    `json:"author_username"`
+	AuthorIdentifier  uuid.UUID `json:"author_identifier"`
+	MessageId         uuid.UUID `json:"message_id"`
+	ReplyToIdentifier uuid.UUID `json:"reply_to_identifier"`
+	Content           string    `json:"content"`
+	CreatedAt         time.Time `json:"created_at"`
+	InTable           rune      `json:"in_table"`
+	InTableIdentifier uuid.UUID `json:"in_table_identifier"`
 }
 
 func insertMessageHandler(w http.ResponseWriter, r *http.Request) {
@@ -76,33 +76,25 @@ func insertMessageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len([]rune(inTable)) == 1 {
-		inTableRune = []rune(inTable)[0]
-	} else {
-		errs = append(errs, errors.New("something went wrong try again"))
-		return
-	}
-
-	var tableType string
-	switch inTableRune {
-	case 'F':
-		tableType = "forums"
-	case 'A':
-		tableType = "articles"
-	case 'P':
-		tableType = "polls"
+	switch inTable {
+	case "forums":
+		inTableRune = 'F'
+	case "articles":
+		inTableRune = 'A'
+	case "polls":
+		inTableRune = 'P'
 	default:
 		errs = append(errs, errors.New("something went wrong table type does not exists"))
 		return
 	}
 
-	inTableID, err := uuid.Parse(r.PathValue("inTableID"))
+	InTableIdentifier, err := uuid.Parse(r.FormValue("InTableIdentifier"))
 	if err != nil {
 		errs = append(errs, errors.New("something went wrong try again"))
 		return
 	}
 
-	exists, err := getInTableID(ctx, inTableID, tableType)
+	exists, err := getInTableID(ctx, InTableIdentifier, inTable)
 	if err != nil {
 		errs = append(errs, errors.New("something went wrong in server try again"))
 		return
@@ -119,7 +111,7 @@ func insertMessageHandler(w http.ResponseWriter, r *http.Request) {
 		ReplyToIdentifier: replyToIdentifierUUID,
 		Content:           messageContent,
 		InTable:           inTableRune,
-		InTableID:         inTableID,
+		InTableIdentifier: InTableIdentifier,
 	}
 
 	msg.insertMessage(ctx)
@@ -130,10 +122,10 @@ func insertMessageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	roomKey := RoomKey{ID: inTableID, RoomType: tableType}
+	roomKey := RoomKey{id: InTableIdentifier, roomtype: inTable}
 
 	// add websocket here or if needed add redis for cache
-	wsSrv.broadcast(msgByte, roomKey)
+	rmSrv.publishHandler(roomKey, msgByte)
 }
 
 func (msg Message) insertMessage(ctx context.Context) (Message, error) {
@@ -144,8 +136,8 @@ func (msg Message) insertMessage(ctx context.Context) (Message, error) {
 		insertMsg = `INSERT INTO messages (author, author_id, content, in_table, in_table_id)
                      VALUES ($1, $2, $3, $4, $5)
                      RETURNING message_id, author, author_id, content, created_at, in_table, in_table_id`
-		err := database.Dbpool.QueryRow(ctx, insertMsg, msg.AuthorUsername, msg.AuthorIdentifier, msg.Content, msg.InTable, msg.InTableID).Scan(
-			&result.MessageId, &result.AuthorUsername, &result.AuthorIdentifier, &result.Content, &result.CreatedAt, &result.InTable, &result.InTableID)
+		err := database.Dbpool.QueryRow(ctx, insertMsg, msg.AuthorUsername, msg.AuthorIdentifier, msg.Content, msg.InTable, msg.InTableIdentifier).Scan(
+			&result.MessageId, &result.AuthorUsername, &result.AuthorIdentifier, &result.Content, &result.CreatedAt, &result.InTable, &result.InTableIdentifier)
 		if err != nil {
 			return Message{}, err
 		}
@@ -153,8 +145,8 @@ func (msg Message) insertMessage(ctx context.Context) (Message, error) {
 		insertMsg = `INSERT INTO messages (author, author_id, reply_to, content, in_table, in_table_id)
                      VALUES ($1, $2, $3, $4, $5, $6)
                      RETURNING message_id, author, author_id, reply_to_identifier, content, created_at, in_table, in_table_id`
-		err := database.Dbpool.QueryRow(ctx, insertMsg, msg.AuthorUsername, msg.AuthorIdentifier, msg.ReplyToIdentifier, msg.Content, msg.InTable, msg.InTableID).Scan(
-			&result.MessageId, &result.AuthorUsername, &result.AuthorIdentifier, &result.ReplyToIdentifier, &result.Content, &result.CreatedAt, &result.InTable, &result.InTableID)
+		err := database.Dbpool.QueryRow(ctx, insertMsg, msg.AuthorUsername, msg.AuthorIdentifier, msg.ReplyToIdentifier, msg.Content, msg.InTable, msg.InTableIdentifier).Scan(
+			&result.MessageId, &result.AuthorUsername, &result.AuthorIdentifier, &result.ReplyToIdentifier, &result.Content, &result.CreatedAt, &result.InTable, &result.InTableIdentifier)
 		if err != nil {
 			return Message{}, err
 		}

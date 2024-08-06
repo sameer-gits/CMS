@@ -3,7 +3,6 @@ module github.com/sameer-gits/CMS
 go 1.22.1
 
 require (
-	github.com/gobwas/ws v1.4.0
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.6.0
 	github.com/joho/godotenv v1.5.1
@@ -12,8 +11,8 @@ require (
 )
 
 require (
-	github.com/gobwas/httphead v0.1.0 // indirect
-	github.com/gobwas/pool v0.2.1 // indirect
+	github.com/lesismal/llib v1.1.13 // indirect
+	github.com/lesismal/nbio v1.5.9 // indirect
 	golang.org/x/sys v0.15.0 // indirect
 )
 

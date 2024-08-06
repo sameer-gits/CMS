@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -89,7 +90,7 @@ func validateForm(r *http.Request) (FormUser, []error) {
 	// Username
 	if strings.TrimSpace(form.Username) == "" {
 		errs = append(errs, errors.New("please provide username"))
-	} else if len(form.Username) < 3 || len(form.Username) > 66 {
+	} else if countCharacters(form.Username) < 3 || countCharacters(form.Username) > 66 {
 		errs = append(errs, errors.New("usernames must be between 3 to 66 characters long and can only contain letters, numbers, -, _ or max 1 dot in between characters"))
 	} else if !isValidUsername(form.Username) {
 		errs = append(errs, errors.New("usernames must be between 3 to 66 characters long and can only contain letters, numbers, -, _ or max 1 dot in between characters"))
@@ -98,7 +99,7 @@ func validateForm(r *http.Request) (FormUser, []error) {
 	// Fullname
 	if strings.TrimSpace(form.Fullname) == "" {
 		errs = append(errs, errors.New("please provide fullname"))
-	} else if len(form.Fullname) < 2 || len(form.Fullname) > 66 {
+	} else if countCharacters(form.Fullname) < 2 || countCharacters(form.Fullname) > 66 {
 		errs = append(errs, errors.New("fullname must be between 2 and 66 characters"))
 	}
 
@@ -111,7 +112,7 @@ func validateForm(r *http.Request) (FormUser, []error) {
 	// Password
 	if strings.TrimSpace(form.Password) == "" {
 		errs = append(errs, errors.New("please provide password"))
-	} else if len(form.Password) < 8 || len(form.Password) > 18 {
+	} else if countCharacters(form.Password) < 8 || countCharacters(form.Password) > 18 {
 		errs = append(errs, errors.New("password must be between 8 to 18 characters and contain at least one uppercase letter, lowercase letter, number and special character"))
 	} else if !hasRequiredPasswordChars(form.Password) {
 		errs = append(errs, errors.New("password must be between 8 to 18 characters and contain at least one uppercase letter, lowercase letter, number and special character"))
@@ -287,4 +288,8 @@ func getInTableID(ctx context.Context, inTableID uuid.UUID, tableType string) (b
 		return false, err
 	}
 	return true, nil
+}
+
+func countCharacters(s string) int {
+	return utf8.RuneCountInString(s)
 }
