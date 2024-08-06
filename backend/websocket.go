@@ -74,7 +74,6 @@ func (rm *RoomManager) subscribeHandler(w http.ResponseWriter, r *http.Request) 
 		roomtype: rmType,
 	}
 	rm.subscribe(key, conn)
-
 }
 
 func (rm *RoomManager) subscribe(key RoomKey, conn *websocket.Conn) {

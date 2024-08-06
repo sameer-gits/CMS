@@ -37,7 +37,9 @@ CREATE TABLE IF NOT EXISTS messages (
     reply_to_identifier UUID,
     content TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- this is for forum, article, and poll
     in_table CHAR CHECK (in_table IN ('F', 'A', 'P')) NOT NULL,
+    -- this is for forum_id, article_id, and poll_id
     in_table_id UUID NOT NULL
 );
 

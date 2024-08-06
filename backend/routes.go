@@ -46,7 +46,7 @@ func routes() {
 	mux.HandleFunc("/404", notFoundHandler)
 	mux.HandleFunc("/verify", redirectLoginHandler)
 	mux.HandleFunc("/resendotp", redirectLoginHandler)
-	mux.HandleFunc("/forums/{id}", viewForumHandler)
+	mux.HandleFunc("/forum/{id}", viewForumHandler)
 
 	mux.HandleFunc("POST /login", createUserHandler)
 	mux.HandleFunc("POST /verify", verifyUserHandler)

@@ -273,14 +273,15 @@ func getUserIdentifier(ctx context.Context, userIdentifier uuid.UUID) (bool, err
 	return true, nil
 }
 
-func getInTableID(ctx context.Context, inTableID uuid.UUID, tableType string) (bool, error) {
+func getInTableId(ctx context.Context, inTableID uuid.UUID, tableType string) (bool, error) {
 	var tableID uuid.UUID
-	getUser := fmt.Sprintf(`
-	SELECT user_identifier
-	FROM %s WHERE user_identifier = $1;
-	`, pq.QuoteIdentifier(tableType))
+	inTableType := pq.QuoteIdentifier(tableType)
+	get := fmt.Sprintf(`
+	SELECT %s_id
+	FROM %s WHERE %s_id = $1;
+	`, inTableType, inTableType, inTableType)
 
-	err := database.Dbpool.QueryRow(ctx, getUser, inTableID).Scan(&tableID)
+	err := database.Dbpool.QueryRow(ctx, get, inTableID).Scan(&tableID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return false, nil
