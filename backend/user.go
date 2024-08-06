@@ -278,7 +278,7 @@ func getInTableId(ctx context.Context, inTableID uuid.UUID, tableType string) (b
 	inTableType := pq.QuoteIdentifier(tableType)
 	get := fmt.Sprintf(`
 	SELECT %s_id
-	FROM %s WHERE %s_id = $1;
+	FROM %ss WHERE %s_id = $1;
 	`, inTableType, inTableType, inTableType)
 
 	err := database.Dbpool.QueryRow(ctx, get, inTableID).Scan(&tableID)
