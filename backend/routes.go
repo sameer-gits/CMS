@@ -285,6 +285,12 @@ func resendOtpHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if redisUser.Email == "" {
+		formUser.Email = ""
+		errs = append(errs, errors.New("error no email is register maybe timeout try registering again"))
+		return
+	}
+
 	if redisUser.Request == 5 {
 		tx := database.RedisAllClients.Client0.TxPipeline()
 
@@ -311,12 +317,6 @@ func resendOtpHandler(w http.ResponseWriter, r *http.Request) {
 	tx.Expire(ctx, redisUser.Email, 2*time.Minute).Err()
 	_, err = tx.Exec(ctx)
 	if err != nil {
-		return
-	}
-
-	if redisUser.Email == "" {
-		formUser.Email = ""
-		errs = append(errs, errors.New("error no email is register maybe timeout try registering again"))
 		return
 	}
 
