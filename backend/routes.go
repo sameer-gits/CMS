@@ -160,21 +160,19 @@ func createUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	headers := "From: " + os.Getenv("EMAIL_HEADER") + "\r\n" +
-		"To: " + redisUser.Email + "\r\n" +
-		"Subject: Your One-Time Password\r\n" +
-		"\r\n"
-
-	body := fmt.Sprintf("Hello your One-Time Password is %d, Valid for 2mins.", redisUser.Otp)
-
-	message := headers + body
+	message := []byte(fmt.Sprintf("To: %v\r\n", redisUser.Email) +
+		fmt.Sprintf("From: %v\r\n", os.Getenv("SMTP_EMAIL")) +
+		"Subject: Want to get verified?, YOUR OTP\r\n" +
+		"\r\n" +
+		fmt.Sprintf("Hello, your One-Time Password is %d. Valid for 2 mins.\r\n", redisUser.Otp) +
+		"Here’s the space for our great sales pitch\r\n")
 
 	// send OTP to user here
 	sendMailTo := MailTo{
-		from:        os.Getenv("EMAIL_SMTP"),
-		password:    os.Getenv("EMAIL_SMTP_PASSWORD"),
+		from:        os.Getenv("SMTP_EMAIL"),
+		password:    os.Getenv("SMTP_PASSWORD"),
 		sendTo:      []string{redisUser.Email},
-		smtpHost:    "smtp-relay.brevo.com",
+		smtpHost:    "live.smtp.mailtrap.io",
 		smtpPort:    "587",
 		mailMessage: message,
 	}
@@ -320,21 +318,21 @@ func resendOtpHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	headers := "From: " + os.Getenv("EMAIL_HEADER") + "\r\n" +
-		"To: " + redisUser.Email + "\r\n" +
-		"Subject: Your New One-Time Password\r\n" +
-		"\r\n"
+	redisUser.Otp = otpGen
 
-	body := fmt.Sprintf("Hello your New One-Time Password is %d, Valid for 2mins.", otpGen)
-
-	message := headers + body
+	message := []byte(fmt.Sprintf("To: %v\r\n", redisUser.Email) +
+		fmt.Sprintf("From: %v\r\n", os.Getenv("SMTP_EMAIL")) +
+		"Subject: Not verified yet?, YOUR NEW OTP\r\n" +
+		"\r\n" +
+		fmt.Sprintf("Hello, your One-Time Password is %d. Valid for 2 mins.\r\n", redisUser.Otp) +
+		"Here’s the space for our great sales pitch\r\n")
 
 	// send OTP to user here
 	sendMailTo := MailTo{
-		from:        os.Getenv("EMAIL_SMTP"),
-		password:    os.Getenv("EMAIL_SMTP_PASSWORD"),
+		from:        os.Getenv("SMTP_EMAIL"),
+		password:    os.Getenv("SMTP_PASSWORD"),
 		sendTo:      []string{redisUser.Email},
-		smtpHost:    "smtp-relay.brevo.com",
+		smtpHost:    "live.smtp.mailtrap.io",
 		smtpPort:    "587",
 		mailMessage: message,
 	}
