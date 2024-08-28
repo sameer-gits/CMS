@@ -170,10 +170,11 @@ func createUserHandler(w http.ResponseWriter, r *http.Request) {
 	// send OTP to user here
 	sendMailTo := MailTo{
 		from:        os.Getenv("SMTP_EMAIL"),
+		username:    os.Getenv("SMTP_USERNAME"),
 		password:    os.Getenv("SMTP_PASSWORD"),
 		sendTo:      []string{redisUser.Email},
-		smtpHost:    "live.smtp.mailtrap.io",
-		smtpPort:    "587",
+		smtpHost:    os.Getenv("SMTP_HOST"),
+		smtpPort:    os.Getenv("SMTP_PORT"),
 		mailMessage: message,
 	}
 
@@ -330,10 +331,11 @@ func resendOtpHandler(w http.ResponseWriter, r *http.Request) {
 	// send OTP to user here
 	sendMailTo := MailTo{
 		from:        os.Getenv("SMTP_EMAIL"),
+		username:    os.Getenv("SMTP_USERNAME"),
 		password:    os.Getenv("SMTP_PASSWORD"),
 		sendTo:      []string{redisUser.Email},
-		smtpHost:    "live.smtp.mailtrap.io",
-		smtpPort:    "587",
+		smtpHost:    os.Getenv("SMTP_HOST"),
+		smtpPort:    os.Getenv("SMTP_PORT"),
 		mailMessage: message,
 	}
 
